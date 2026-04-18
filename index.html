@@ -286,6 +286,22 @@
 
     <!-- Actions -->
     <div class="px-4 pb-5 pt-4 border-t border-gray-700 space-y-2">
+      <!-- KML Import -->
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1">Import bản đồ KML</p>
+      <label id="kml-label" class="w-full py-2.5 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer">
+        📂 Tải file KML lên
+        <input type="file" id="kml-input" accept=".kml,.kmz" class="hidden" onchange="importKML(event)" />
+      </label>
+      <div id="kml-status" class="hidden text-xs text-indigo-300 bg-indigo-900/40 border border-indigo-800 rounded-lg px-3 py-2">
+        <div class="flex items-center justify-between">
+          <span id="kml-status-text">—</span>
+          <div class="flex gap-2">
+            <button onclick="toggleKMLLayer()" id="btn-kml-toggle" class="text-indigo-300 hover:text-white transition-colors">👁 Ẩn</button>
+            <button onclick="removeKMLLayer()" class="text-red-400 hover:text-red-300 transition-colors">✕</button>
+          </div>
+        </div>
+      </div>
+      <hr class="border-gray-700" />
       <button onclick="exportGeoJSON()" class="w-full py-2.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-sm font-semibold transition-colors flex items-center justify-center gap-2">📥 Xuất GeoJSON</button>
       <button onclick="clearAll()"      class="w-full py-2.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-900/30 text-sm font-semibold transition-colors">🗑️ Xóa tất cả (local)</button>
     </div>
@@ -944,6 +960,174 @@
     localStorage.removeItem(LS_KEY);
     refreshTDPList();
     showStatus('🗑️ Đã xóa local', 'red');
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  KML IMPORT
+  // ════════════════════════════════════════════════════════════
+  let kmlLayer = null;
+  let kmlVisible = true;
+
+  function importKML(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        // Remove existing KML layer
+        if (kmlLayer) { map.removeLayer(kmlLayer); kmlLayer = null; }
+
+        const parser = new DOMParser();
+        const kmlDoc = parser.parseFromString(e.target.result, 'text/xml');
+
+        // Check parse error
+        const parseErr = kmlDoc.querySelector('parsererror');
+        if (parseErr) throw new Error('File KML không hợp lệ');
+
+        const layers = [];
+        let featureCount = 0;
+
+        // ── Parse Placemarks ──────────────────────────────────
+        kmlDoc.querySelectorAll('Placemark').forEach(pm => {
+          const name  = pm.querySelector('name')?.textContent?.trim() || '';
+          const desc  = pm.querySelector('description')?.textContent?.trim() || '';
+          const style = getKMLStyle(pm, kmlDoc);
+
+          // Polygon
+          pm.querySelectorAll('Polygon').forEach(polygon => {
+            const coords = parseKMLCoords(polygon.querySelector('outerBoundaryIs coordinates') ||
+                                          polygon.querySelector('coordinates'));
+            if (coords.length < 3) return;
+            const poly = L.polygon(coords, {
+              color: style.stroke, weight: style.strokeWidth,
+              fillColor: style.fill, fillOpacity: style.fillOpacity, opacity: 0.9,
+            });
+            if (name || desc) poly.bindPopup(makeKMLPopup(name, desc));
+            if (name) poly.bindTooltip(`<b>${name}</b>`, {
+              permanent: true, direction: 'center', className: 'area-tooltip', interactive: false,
+            });
+            layers.push(poly);
+            featureCount++;
+          });
+
+          // LineString
+          pm.querySelectorAll('LineString').forEach(ls => {
+            const coords = parseKMLCoords(ls.querySelector('coordinates'));
+            if (coords.length < 2) return;
+            const line = L.polyline(coords, { color: style.stroke, weight: style.strokeWidth, opacity: 0.9 });
+            if (name || desc) line.bindPopup(makeKMLPopup(name, desc));
+            layers.push(line);
+            featureCount++;
+          });
+
+          // Point
+          pm.querySelectorAll('Point').forEach(pt => {
+            const coords = parseKMLCoords(pt.querySelector('coordinates'));
+            if (coords.length < 1) return;
+            const marker = L.circleMarker(coords[0], {
+              radius: 6, color: style.stroke, fillColor: style.fill,
+              fillOpacity: 0.85, weight: 2,
+            });
+            if (name || desc) marker.bindPopup(makeKMLPopup(name, desc));
+            layers.push(marker);
+            featureCount++;
+          });
+        });
+
+        if (!layers.length) throw new Error('Không tìm thấy dữ liệu hình học trong file KML');
+
+        kmlLayer = L.featureGroup(layers).addTo(map);
+        kmlVisible = true;
+
+        // Fly to KML extent
+        map.fitBounds(kmlLayer.getBounds(), { padding: [30, 30], animate: true });
+
+        // Show status bar
+        const statusEl = document.getElementById('kml-status');
+        statusEl.classList.remove('hidden');
+        document.getElementById('kml-status-text').textContent =
+          `✅ ${file.name} · ${featureCount} đối tượng`;
+        document.getElementById('btn-kml-toggle').textContent = '👁 Ẩn';
+
+        showStatus(`📂 Đã load KML: ${featureCount} đối tượng`, 'blue');
+
+        // Reset input so same file can be re-imported
+        event.target.value = '';
+
+      } catch (err) {
+        showStatus('❌ Lỗi KML: ' + err.message, 'red');
+        console.error(err);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  function parseKMLCoords(el) {
+    if (!el) return [];
+    const raw = (el.textContent || el.getAttribute?.('') || '').trim();
+    return raw.split(/\s+/).map(pair => {
+      const parts = pair.split(',').map(Number);
+      if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+      return [parts[1], parts[0]]; // KML is [lng,lat,alt] → Leaflet [lat,lng]
+    }).filter(Boolean);
+  }
+
+  function getKMLStyle(pm, kmlDoc) {
+    const defaults = { stroke: '#6366f1', fill: '#818cf8', strokeWidth: 2, fillOpacity: 0.25 };
+    try {
+      const styleUrl = pm.querySelector('styleUrl')?.textContent?.replace('#', '');
+      let styleEl = styleUrl ? kmlDoc.getElementById(styleUrl) : null;
+      if (!styleEl) styleEl = pm.querySelector('Style');
+      if (!styleEl) return defaults;
+
+      const lineHex = styleEl.querySelector('LineStyle color')?.textContent;
+      const polyHex = styleEl.querySelector('PolyStyle color')?.textContent;
+      const width   = parseFloat(styleEl.querySelector('LineStyle width')?.textContent) || 2;
+      const fillOp  = parseFloat(styleEl.querySelector('PolyStyle opacity')?.textContent);
+
+      return {
+        stroke:      lineHex ? kmlColorToHex(lineHex) : defaults.stroke,
+        fill:        polyHex ? kmlColorToHex(polyHex) : defaults.fill,
+        strokeWidth: Math.min(Math.max(width, 1), 6),
+        fillOpacity: isNaN(fillOp) ? 0.25 : fillOp,
+      };
+    } catch { return defaults; }
+  }
+
+  // KML color is AABBGGRR → CSS #RRGGBB
+  function kmlColorToHex(kmlColor) {
+    if (!kmlColor || kmlColor.length < 6) return '#6366f1';
+    const c = kmlColor.replace(/[^0-9a-fA-F]/g, '').padStart(8, 'f');
+    return '#' + c.slice(6,8) + c.slice(4,6) + c.slice(2,4);
+  }
+
+  function makeKMLPopup(name, desc) {
+    return `<div style="font-family:Inter,sans-serif;min-width:160px">
+      ${name ? `<p style="font-weight:700;font-size:14px;color:#a5b4fc;margin:0 0 5px 0">${name}</p>` : ''}
+      ${desc ? `<p style="font-size:12px;color:#d1d5db;margin:0">${desc}</p>` : ''}
+    </div>`;
+  }
+
+  function toggleKMLLayer() {
+    if (!kmlLayer) return;
+    const btn = document.getElementById('btn-kml-toggle');
+    if (kmlVisible) {
+      map.removeLayer(kmlLayer);
+      kmlVisible = false;
+      btn.textContent = '👁 Hiện';
+    } else {
+      kmlLayer.addTo(map);
+      kmlVisible = true;
+      btn.textContent = '👁 Ẩn';
+    }
+  }
+
+  function removeKMLLayer() {
+    if (kmlLayer) { map.removeLayer(kmlLayer); kmlLayer = null; }
+    document.getElementById('kml-status').classList.add('hidden');
+    document.getElementById('kml-input').value = '';
+    showStatus('🗑️ Đã xóa lớp KML', 'yellow');
   }
 
   // ════════════════════════════════════════════════════════════
