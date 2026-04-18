@@ -295,9 +295,10 @@
       <div id="kml-status" class="hidden text-xs text-indigo-300 bg-indigo-900/40 border border-indigo-800 rounded-lg px-3 py-2">
         <div class="flex items-center justify-between">
           <span id="kml-status-text">—</span>
-          <div class="flex gap-2 items-center">
-            <button onclick="toggleKMLLayer()" id="btn-kml-toggle" class="px-2 py-1 bg-indigo-800/50 rounded hover:bg-indigo-700 transition-colors">👁 Ẩn</button>
-            <button onclick="removeKMLLayer()" class="px-2 py-1 bg-red-900/50 text-red-300 rounded hover:bg-red-800 transition-colors">🗑 Gỡ bỏ</button>
+          <div class="flex flex-wrap gap-2 items-center mt-2">
+            <button onclick="toggleKMLLayer()" id="btn-kml-toggle" class="px-2 py-1 bg-indigo-800/50 rounded hover:bg-indigo-700 transition-colors text-[10px]">👁 Ẩn/Hiện</button>
+            <button onclick="saveKMLToFirebase()" id="btn-kml-save" class="px-2 py-1 bg-green-700/60 text-green-100 rounded hover:bg-green-600 transition-colors text-[10px] font-bold">🔥 Lưu vào Database</button>
+            <button onclick="removeKMLLayer()" class="px-2 py-1 bg-red-900/50 text-red-300 rounded hover:bg-red-800 transition-colors text-[10px]">🗑 Gỡ bỏ</button>
           </div>
         </div>
       </div>
@@ -1164,6 +1165,66 @@
     document.getElementById('kml-status').classList.add('hidden');
     document.getElementById('kml-input').value = '';
     showStatus('🗑️ Đã xóa lớp KML', 'yellow');
+  }
+
+  async function saveKMLToFirebase() {
+    if (!kmlLayer || !firebaseReady || !db) {
+      showStatus('❌ Không có dữ liệu KML hoặc lỗi Firebase', 'red');
+      return;
+    }
+
+    const layers = kmlLayer.getLayers();
+    if (layers.length === 0) return;
+
+    if (!confirm(`Bạn có chắc muốn lưu vĩnh viễn ${layers.length} vùng này vào Database không? Những người khác sẽ thấy ngay lập tức.`)) return;
+
+    const btn = document.getElementById('btn-kml-save');
+    const oldText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span> Đang lưu…';
+    btn.disabled = true;
+
+    let countSaved = 0;
+    const now = new Date().toISOString();
+    const donViDefault = document.getElementById('inp-donvi').value || 'Liên Chiểu, Đà Nẵng';
+    const canBoDefault = document.getElementById('inp-canbo').value || 'Import từ KML';
+
+    try {
+      for (const layer of layers) {
+        // Only polygons
+        if (!(layer instanceof L.Polygon)) continue;
+
+        const name = layer.getTooltip()?.getContent()?.replace(/<[^>]*>/g, '') || 'Không tên';
+        const fbKey = name.replace(/[.#$\[\]/]/g, '_');
+        const latlngs = layer.getLatLngs()[0];
+        
+        const tdpObj = {
+          id_to_dan_pho:    name,
+          ten_to:           name,
+          can_bo_phu_trach: canBoDefault,
+          don_vi:           donViDefault,
+          timestamp:        now,
+          area_m2:          Math.round(calcAreaFromLatLngs(latlngs)),
+          color:            layer.options.color || '#3b82f6',
+          geometry: { 
+            type: 'Polygon', 
+            coordinates: [latlngsToGeoCoords(latlngs)] 
+          },
+        };
+
+        await db.ref(`tdp_boundaries/${fbKey}`).set(tdpObj);
+        countSaved++;
+      }
+
+      showStatus(`✅ Đã lưu vĩnh viễn ${countSaved} vùng vào Firebase!`, 'green');
+      removeKMLLayer(); // Clear temporary layer after successful bulk save
+      
+    } catch (err) {
+      console.error(err);
+      showStatus('❌ Lỗi khi lưu: ' + err.message, 'red');
+    } finally {
+      btn.innerHTML = oldText;
+      btn.disabled = false;
+    }
   }
 
   // ════════════════════════════════════════════════════════════
