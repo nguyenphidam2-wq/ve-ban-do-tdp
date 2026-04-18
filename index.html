@@ -295,9 +295,9 @@
       <div id="kml-status" class="hidden text-xs text-indigo-300 bg-indigo-900/40 border border-indigo-800 rounded-lg px-3 py-2">
         <div class="flex items-center justify-between">
           <span id="kml-status-text">—</span>
-          <div class="flex gap-2">
-            <button onclick="toggleKMLLayer()" id="btn-kml-toggle" class="text-indigo-300 hover:text-white transition-colors">👁 Ẩn</button>
-            <button onclick="removeKMLLayer()" class="text-red-400 hover:text-red-300 transition-colors">✕</button>
+          <div class="flex gap-2 items-center">
+            <button onclick="toggleKMLLayer()" id="btn-kml-toggle" class="px-2 py-1 bg-indigo-800/50 rounded hover:bg-indigo-700 transition-colors">👁 Ẩn</button>
+            <button onclick="removeKMLLayer()" class="px-2 py-1 bg-red-900/50 text-red-300 rounded hover:bg-red-800 transition-colors">🗑 Gỡ bỏ</button>
           </div>
         </div>
       </div>
@@ -1050,7 +1050,7 @@
           `✅ ${file.name} · ${featureCount} đối tượng`;
         document.getElementById('btn-kml-toggle').textContent = '👁 Ẩn';
 
-        showStatus(`📂 Đã load KML: ${featureCount} đối tượng`, 'blue');
+        showStatus(`📂 Đã load KML: ${featureCount} đối tượng. <a href="#" onclick="removeKMLLayer(); return false;" class="underline ml-2 font-bold">HOÀN TÁC</a>`, 'blue');
 
         // Reset input so same file can be re-imported
         event.target.value = '';
