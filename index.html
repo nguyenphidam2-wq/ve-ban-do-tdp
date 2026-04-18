@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Vẽ Ranh Giới TDP – Công An Liên Chiểu, Đà Nẵng</title>
+  <meta name="description" content="Ứng dụng vẽ và quản lý ranh giới Tổ dân phố cho Công an phường quận Liên Chiểu, Đà Nẵng." />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#1a56db', dark: '#1e429f', light: '#76a9fa' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; overscroll-behavior: none; }
+
+    /* MAP */
+    #map { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; }
+
+    /* Crosshair cursor while drawing */
+    #map.drawing-mode { cursor: crosshair !important; }
+    #map.drawing-mode .leaflet-interactive { cursor: crosshair !important; }
+
+    /* SIDEBAR */
+    #sidebar {
+      position: fixed; top: 0; left: 0; height: 100%; width: 320px;
+      z-index: 500; background: rgba(17,24,39,0.97); backdrop-filter: blur(12px);
+      border-right: 1px solid rgba(55,65,81,0.6);
+      display: flex; flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+      overflow-y: auto;
+    }
+    #sidebar.open { transform: translateX(0); }
+
+    /* TOP BAR */
+    #topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 56px;
+      z-index: 400; background: rgba(17,24,39,0.95); backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(55,65,81,0.5);
+      display: flex; align-items: center; padding: 0 12px; gap: 10px;
+    }
+
+    /* DRAWING TOOLBAR — bottom center, shows while drawing */
+    #draw-toolbar {
+      position: fixed;
+      bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 450;
+      display: none;
+      align-items: center; gap: 10px;
+      background: rgba(17,24,39,0.97);
+      border: 1px solid rgba(55,65,81,0.8);
+      border-radius: 999px;
+      padding: 8px 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      backdrop-filter: blur(12px);
+      white-space: nowrap;
+    }
+    #draw-toolbar.active { display: flex; }
+    .draw-btn {
+      padding: 8px 16px; border-radius: 999px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .draw-btn:active { transform: scale(0.95); }
+    .draw-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* Point count badge */
+    #draw-count {
+      font-size: 13px; font-weight: 600;
+      color: #93c5fd; min-width: 28px; text-align: center;
+    }
+
+    /* FABs */
+    .fab-group {
+      position: fixed; right: 14px; bottom: 24px;
+      z-index: 400; display: flex; flex-direction: column; gap: 10px;
+    }
+    .fab {
+      width: 52px; height: 52px; border-radius: 50%; border: none;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 22px; box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .fab:active { transform: scale(0.92); }
+
+    /* BIG DRAW BUTTON bottom-left */
+    #btn-start-draw {
+      position: fixed;
+      bottom: 24px; left: 14px;
+      z-index: 400;
+      padding: 14px 20px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+      color: #fff; border: none; cursor: pointer;
+      font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 6px 24px rgba(29,78,216,0.5);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    #btn-start-draw:active { transform: scale(0.95); }
+    #btn-start-draw.hidden { display: none !important; }
+
+    /* STATUS BADGE */
+    #status-badge {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      z-index: 400; padding: 6px 18px; border-radius: 999px;
+      font-size: 13px; font-weight: 500; white-space: nowrap;
+      pointer-events: none; transition: opacity 0.4s;
+    }
+
+    /* OVERLAYS & MODAL */
+    #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 490; display: none; }
+    #overlay.visible { display: block; }
+    #modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+      z-index: 600; display: none; align-items: center;
+      justify-content: center; padding: 16px;
+    }
+    #modal-backdrop.visible { display: flex; }
+    #modal-box {
+      background: #1f2937; border: 1px solid #374151; border-radius: 16px;
+      width: 100%; max-width: 420px; padding: 24px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+
+    /* FORMS */
+    .form-input {
+      width: 100%; padding: 9px 12px; background: #111827;
+      border: 1px solid #374151; border-radius: 8px;
+      color: #e5e7eb; font-size: 14px; outline: none; transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: #3b82f6; }
+    .form-label { display: block; font-size: 12px; font-weight: 500; color: #9ca3af; margin-bottom: 4px; letter-spacing: 0.03em; }
+
+    /* TDP LIST */
+    .tdp-item {
+      background: #111827; border: 1px solid #374151; border-radius: 10px;
+      padding: 10px 12px; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    }
+    .tdp-item:hover { border-color: #3b82f6; background: #1a2744; }
+
+    /* LAYER BUTTONS */
+    .layer-btn { border-color: #4b5563 !important; color: #9ca3af !important; background: #1f2937 !important; }
+    .layer-btn.active-layer { border-color: #3b82f6 !important; color: #93c5fd !important; background: #1e3a5f !important; }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+
+    /* AREA TOOLTIP */
+    .area-tooltip {
+      background: rgba(30,66,159,0.9) !important; border: none !important;
+      border-radius: 6px !important; color: #bfdbfe !important;
+      font-size: 12px !important; font-weight: 600 !important;
+      padding: 3px 8px !important; white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+    }
+    .area-tooltip::before { display: none; }
+
+    /* VERTEX DOT */
+    .vertex-dot {
+      width: 12px; height: 12px; background: #fff;
+      border: 2.5px solid #f59e0b; border-radius: 50%;
+    }
+
+    /* GPS PULSE */
+    @keyframes pulse-ring {
+      0%   { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    .gps-pulse-icon > div {
+      width: 20px; height: 20px; background: #3b82f6;
+      border: 3px solid #fff; border-radius: 50%; position: relative;
+    }
+    .gps-pulse-icon > div::after {
+      content: ''; position: absolute; top: -3px; left: -3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(59,130,246,0.4);
+      animation: pulse-ring 1.6s ease-out infinite;
+    }
+
+    /* POPUPS */
+    .leaflet-popup-content-wrapper {
+      background: rgba(31,41,55,0.98) !important; color: #e5e7eb !important;
+      border: 1px solid #374151 !important; border-radius: 10px !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    }
+    .leaflet-popup-tip { background: #1f2937 !important; }
+    .leaflet-popup-close-button { color: #9ca3af !important; }
+    .leaflet-control-zoom { display: none !important; }
+
+    /* SPINNER */
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* GUIDE LINE (dashed preview to mouse) */
+    .preview-line { stroke-dasharray: 8 5; }
+
+    @media (max-width: 640px) {
+      #sidebar { width: 100%; }
+      #draw-toolbar { font-size: 12px; padding: 7px 12px; gap: 8px; }
+      .draw-btn { padding: 7px 12px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+  <div id="map"></div>
+  <div id="overlay" onclick="closeSidebar()"></div>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside id="sidebar">
+    <div class="flex items-center gap-3 px-4 py-4 border-b border-gray-700">
+      <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-lg flex-shrink-0">🗺️</div>
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-sm">Vẽ Ranh Giới TDP</p>
+        <p class="text-xs text-gray-400">Công an Liên Chiểu – Đà Nẵng</p>
+      </div>
+      <button onclick="closeSidebar()" class="text-gray-400 hover:text-white p-1">✕</button>
+    </div>
+
+    <!-- Firebase status -->
+    <div id="conn-status" class="mx-4 mt-3 flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-gray-800 border border-gray-700">
+      <span id="conn-dot" class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+      <span id="conn-text">Đang kết nối Firebase…</span>
+    </div>
+
+    <!-- Officer info -->
+    <div class="px-4 mt-4 space-y-3">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Thông tin cán bộ</p>
+      <div>
+        <label class="form-label">Tên cán bộ phụ trách</label>
+        <input id="inp-canbo" class="form-input" type="text" placeholder="VD: Nguyễn Văn A" />
+      </div>
+      <div>
+        <label class="form-label">Đơn vị / Phường</label>
+        <input id="inp-donvi" class="form-input" type="text" value="Liên Chiểu, Đà Nẵng" />
+      </div>
+    </div>
+
+    <hr class="border-gray-700 mx-4 mt-4" />
+
+    <!-- Layer control -->
+    <div class="px-4 mt-4">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Lớp bản đồ</p>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="setLayer('satellite')" id="btn-satellite" class="layer-btn active-layer flex items-center justify-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all">🛰️ Vệ tinh</button>
+        <button onclick="setLayer('streets')"   id="btn-streets"   class="layer-btn flex items-center justify-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all">🗺️ Đường phố</button>
+        <button onclick="setLayer('hybrid')"    id="btn-hybrid"    class="layer-btn flex items-center justify-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all">🌍 Hybrid</button>
+        <button onclick="setLayer('topo')"      id="btn-topo"      class="layer-btn flex items-center justify-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all">🏔️ Địa hình</button>
+      </div>
+    </div>
+
+    <hr class="border-gray-700 mx-4 mt-4" />
+
+    <!-- TDP list -->
+    <div class="px-4 mt-4 flex-1">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Danh sách TDP</p>
+        <span id="tdp-count" class="text-xs bg-blue-900 text-blue-300 px-2 py-0.5 rounded-full">0</span>
+      </div>
+      <div id="tdp-list" class="space-y-2 pb-4">
+        <p class="text-xs text-gray-500 text-center py-4">Chưa có TDP nào.</p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="px-4 pb-5 pt-4 border-t border-gray-700 space-y-2">
+      <button onclick="exportGeoJSON()" class="w-full py-2.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-sm font-semibold transition-colors flex items-center justify-center gap-2">📥 Xuất GeoJSON</button>
+      <button onclick="clearAll()"      class="w-full py-2.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-900/30 text-sm font-semibold transition-colors">🗑️ Xóa tất cả (local)</button>
+    </div>
+  </aside>
+
+  <!-- ═══ TOP BAR ═══ -->
+  <header id="topbar">
+    <button onclick="toggleSidebar()" class="w-9 h-9 rounded-lg flex items-center justify-center bg-gray-800 hover:bg-gray-700 text-lg transition-colors flex-shrink-0">☰</button>
+    <div class="flex-1 min-w-0">
+      <p class="font-semibold text-sm truncate">🗺️ Ranh Giới TDP</p>
+      <p class="text-xs text-gray-400">Liên Chiểu, Đà Nẵng</p>
+    </div>
+    <div id="rt-badge" class="flex items-center gap-1.5 text-xs text-yellow-400 flex-shrink-0">
+      <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+      <span class="hidden sm:inline">Firebase</span>
+    </div>
+  </header>
+
+  <!-- ═══ BIG DRAW BUTTON ═══ -->
+  <button id="btn-start-draw" onclick="startDrawing()">
+    ✏️ Bắt đầu vẽ TDP
+  </button>
+
+  <!-- ═══ DRAWING TOOLBAR (visible while drawing) ═══ -->
+  <div id="draw-toolbar">
+    <!-- Point counter -->
+    <span style="font-size:12px;color:#6b7280">Điểm:</span>
+    <span id="draw-count">0</span>
+    <div style="width:1px;height:20px;background:#374151"></div>
+    <!-- Undo last point -->
+    <button class="draw-btn" id="btn-undo"
+      style="background:#7f1d1d;color:#fca5a5;"
+      onclick="undoLastPoint()" disabled>
+      ↩ Xóa điểm
+    </button>
+    <!-- Finish -->
+    <button class="draw-btn" id="btn-finish"
+      style="background:#14532d;color:#86efac;"
+      onclick="finishDrawing()" disabled>
+      ✅ Hoàn thành
+    </button>
+    <!-- Cancel -->
+    <button class="draw-btn"
+      style="background:#1f2937;color:#9ca3af;border:1px solid #374151;"
+      onclick="cancelDrawing()">
+      ✕ Hủy
+    </button>
+  </div>
+
+  <!-- ═══ FABs — right side ═══ -->
+  <div class="fab-group">
+    <button class="fab bg-blue-600 text-white" onclick="locateMe()" id="btn-locate" title="Định vị tôi">📍</button>
+    <button class="fab bg-gray-800 text-white" onclick="map.zoomIn()"  title="Phóng to">＋</button>
+    <button class="fab bg-gray-800 text-white" onclick="map.zoomOut()" title="Thu nhỏ">－</button>
+  </div>
+
+  <!-- STATUS BADGE -->
+  <div id="status-badge" class="hidden"></div>
+
+  <!-- ═══ SAVE MODAL ═══ -->
+  <div id="modal-backdrop">
+    <div id="modal-box">
+      <h2 class="text-base font-bold mb-4 flex items-center gap-2">📝 Lưu thông tin TDP</h2>
+      <div class="space-y-3">
+        <div>
+          <label class="form-label">Mã Tổ dân phố (ID) <span class="text-red-400">*</span></label>
+          <input id="modal-id" class="form-input" type="text" placeholder="VD: TDP_HM_01" />
+        </div>
+        <div>
+          <label class="form-label">Tên Tổ dân phố <span class="text-red-400">*</span></label>
+          <input id="modal-ten" class="form-input" type="text" placeholder="VD: Tổ 1, Khu dân cư Hòa Minh…" />
+        </div>
+        <div>
+          <label class="form-label">Cán bộ phụ trách</label>
+          <input id="modal-canbo" class="form-input" type="text" placeholder="Tự động điền từ sidebar" />
+        </div>
+        <div class="bg-gray-900 rounded-lg px-3 py-2 text-xs text-gray-400 border border-gray-700 space-y-1">
+          <div>📐 Diện tích: <span id="modal-area"   class="text-blue-300 font-semibold">—</span></div>
+          <div>📍 Số đỉnh:  <span id="modal-coords" class="text-green-300 font-mono">—</span> điểm · EPSG:4326</div>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button onclick="cancelModal()" class="flex-1 py-2.5 rounded-lg border border-gray-600 text-sm font-medium text-gray-300 hover:bg-gray-700 transition-colors">Hủy</button>
+        <button onclick="confirmSave()" id="modal-save-btn" class="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+          💾 Lưu lên Firebase
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCRIPTS ═══ -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+  // ════════════════════════════════════════════════════════════
+  //  FIREBASE CONFIG
+  // ════════════════════════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBedO6Ug1c7t0gEo2K9XT_Yhq2mdBupapA",
+    authDomain:        "tdp-lienchieu.firebaseapp.com",
+    databaseURL:       "https://tdp-lienchieu-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "tdp-lienchieu",
+    storageBucket:     "tdp-lienchieu.firebasestorage.app",
+    messagingSenderId: "782552093507",
+    appId:             "1:782552093507:web:ad7dd5c1d5c0a73e7fd5f6",
+  };
+
+  let db = null, firebaseReady = false;
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    firebaseReady = true;
+  } catch (e) { console.warn('Firebase:', e.message); }
+
+  // ════════════════════════════════════════════════════════════
+  //  CONSTANTS
+  // ════════════════════════════════════════════════════════════
+  const MAP_CENTER  = [16.0745, 108.1385];
+  const MAP_ZOOM    = 15;
+  const POLY_COLORS = [
+    '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+    '#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa',
+  ];
+  const LS_KEY = 'tdp_lienchieu_v2';
+
+  // ════════════════════════════════════════════════════════════
+  //  STATE
+  // ════════════════════════════════════════════════════════════
+  let map, drawnItems;
+  let userMarker    = null;
+  let colorIndex    = 0;
+  let allTDPs       = {};
+
+  // Drawing state
+  let isDrawing     = false;
+  let drawPoints    = [];   // [L.LatLng, ...]
+  let drawMarkers   = [];   // vertex dot markers
+  let drawPolyline  = null; // live polyline
+  let drawGuideLine = null; // dashed line to mouse
+  let pendingLatlngs = null;// finalized latlngs waiting for modal
+
+  // ════════════════════════════════════════════════════════════
+  //  TILE LAYERS
+  // ════════════════════════════════════════════════════════════
+  const TILES = {
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution:'Esri', maxZoom:20 }),
+    hybrid:    L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'], maxZoom:21 }),
+    streets:   L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'], maxZoom:21 }),
+    topo:      L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',   { maxZoom:17 }),
+  };
+  let currentTile = TILES.satellite;
+
+  // ════════════════════════════════════════════════════════════
+  //  MAP INIT
+  // ════════════════════════════════════════════════════════════
+  function initMap() {
+    map = L.map('map', { center: MAP_CENTER, zoom: MAP_ZOOM, zoomControl: false, attributionControl: false });
+    TILES.satellite.addTo(map);
+    L.control.attribution({ position:'bottomleft', prefix:false }).addAttribution('© Esri • Leaflet').addTo(map);
+
+    drawnItems = new L.FeatureGroup().addTo(map);
+
+    // ── Map click: add point while drawing ──────────────────
+    map.on('click', onMapClick);
+
+    // ── Mouse move: draw guide line to cursor ────────────────
+    map.on('mousemove', onMouseMove);
+
+    // ── Double-click: finish drawing ────────────────────────
+    map.on('dblclick', e => {
+      if (isDrawing && drawPoints.length >= 3) {
+        L.DomEvent.stop(e);
+        finishDrawing();
+      }
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — START
+  // ════════════════════════════════════════════════════════════
+  function startDrawing() {
+    isDrawing   = true;
+    drawPoints  = [];
+    drawMarkers = [];
+
+    document.getElementById('map').classList.add('drawing-mode');
+    document.getElementById('btn-start-draw').classList.add('hidden');
+    document.getElementById('draw-toolbar').classList.add('active');
+    updateDrawUI();
+    showStatus('🖊️ Tap/click từng điểm để vẽ ranh giới TDP', 'blue');
+    map.doubleClickZoom.disable();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — MAP CLICK → ADD POINT
+  // ════════════════════════════════════════════════════════════
+  function onMapClick(e) {
+    if (!isDrawing) return;
+
+    const latlng = e.latlng;
+    drawPoints.push(latlng);
+
+    // Vertex dot marker
+    const dotIcon = L.divIcon({
+      className: '', html: '<div class="vertex-dot"></div>',
+      iconSize: [12,12], iconAnchor: [6,6],
+    });
+    const marker = L.marker(latlng, { icon: dotIcon, interactive: false }).addTo(map);
+    drawMarkers.push(marker);
+
+    // Update polyline
+    refreshDrawPolyline();
+    updateDrawUI();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — MOUSE MOVE → GUIDE LINE
+  // ════════════════════════════════════════════════════════════
+  function onMouseMove(e) {
+    if (!isDrawing || drawPoints.length === 0) return;
+
+    const last = drawPoints[drawPoints.length - 1];
+    const pts  = [last, e.latlng];
+
+    if (drawGuideLine) {
+      drawGuideLine.setLatLngs(pts);
+    } else {
+      drawGuideLine = L.polyline(pts, {
+        color: '#f59e0b', weight: 1.5, dashArray: '8 6',
+        opacity: 0.7, interactive: false, className: 'preview-line',
+      }).addTo(map);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — REFRESH POLYLINE
+  // ════════════════════════════════════════════════════════════
+  function refreshDrawPolyline() {
+    if (drawPolyline) { map.removeLayer(drawPolyline); drawPolyline = null; }
+    if (drawPoints.length < 2) return;
+
+    drawPolyline = L.polyline(drawPoints, {
+      color: '#f59e0b', weight: 2.5, opacity: 1, interactive: false,
+    }).addTo(map);
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — UNDO LAST POINT
+  // ════════════════════════════════════════════════════════════
+  function undoLastPoint() {
+    if (!isDrawing || drawPoints.length === 0) return;
+
+    drawPoints.pop();
+    const lastMarker = drawMarkers.pop();
+    if (lastMarker) map.removeLayer(lastMarker);
+
+    refreshDrawPolyline();
+    updateDrawUI();
+
+    if (drawPoints.length === 0) {
+      showStatus('🔄 Đã xóa hết điểm. Bấm lại để vẽ tiếp.', 'yellow');
+    } else {
+      showStatus(`↩ Đã xóa 1 điểm · Còn ${drawPoints.length} điểm`, 'yellow');
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — FINISH (auto-close polygon)
+  // ════════════════════════════════════════════════════════════
+  function finishDrawing() {
+    if (drawPoints.length < 3) {
+      showStatus('⚠️ Cần ít nhất 3 điểm để tạo vùng TDP!', 'red'); return;
+    }
+
+    // Save latlngs before clearing drawing state
+    pendingLatlngs = [...drawPoints];
+
+    // Clean up drawing UI
+    cleanupDrawing(false); // false = don't cancel, keep pending data
+
+    // Calculate area & show modal
+    const area   = calcAreaFromLatLngs(pendingLatlngs);
+    document.getElementById('modal-area').textContent   = formatArea(area);
+    document.getElementById('modal-coords').textContent = pendingLatlngs.length;
+    document.getElementById('modal-canbo').value        = document.getElementById('inp-canbo').value || '';
+
+    openModal();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — CANCEL
+  // ════════════════════════════════════════════════════════════
+  function cancelDrawing() {
+    cleanupDrawing(true);
+    showStatus('❌ Đã hủy vẽ', 'red');
+  }
+
+  function cleanupDrawing(fullCancel = true) {
+    isDrawing = false;
+
+    // Remove all vertex markers
+    drawMarkers.forEach(m => map.removeLayer(m));
+    drawMarkers = [];
+    drawPoints  = [];
+
+    if (drawPolyline)  { map.removeLayer(drawPolyline);  drawPolyline  = null; }
+    if (drawGuideLine) { map.removeLayer(drawGuideLine); drawGuideLine = null; }
+
+    if (fullCancel) pendingLatlngs = null;
+
+    document.getElementById('map').classList.remove('drawing-mode');
+    document.getElementById('btn-start-draw').classList.remove('hidden');
+    document.getElementById('draw-toolbar').classList.remove('active');
+    map.doubleClickZoom.enable();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DRAWING — UPDATE TOOLBAR UI
+  // ════════════════════════════════════════════════════════════
+  function updateDrawUI() {
+    const n = drawPoints.length;
+    document.getElementById('draw-count').textContent = n;
+    document.getElementById('btn-undo').disabled      = n === 0;
+    document.getElementById('btn-finish').disabled    = n < 3;
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  MODAL — OPEN / CANCEL
+  // ════════════════════════════════════════════════════════════
+  function openModal() {
+    document.getElementById('modal-backdrop').classList.add('visible');
+    setTimeout(() => document.getElementById('modal-id').focus(), 120);
+  }
+
+  function cancelModal() {
+    document.getElementById('modal-backdrop').classList.remove('visible');
+    pendingLatlngs = null;
+    clearModalFields();
+  }
+
+  function clearModalFields() {
+    ['modal-id','modal-ten','modal-canbo'].forEach(id => document.getElementById(id).value = '');
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  MODAL — CONFIRM SAVE
+  // ════════════════════════════════════════════════════════════
+  async function confirmSave() {
+    const idTDP  = document.getElementById('modal-id').value.trim();
+    const tenTDP = document.getElementById('modal-ten').value.trim();
+    const canBo  = document.getElementById('modal-canbo').value.trim()
+                 || document.getElementById('inp-canbo').value.trim()
+                 || 'Chưa xác định';
+
+    if (!idTDP)  { shake('modal-id');  return; }
+    if (!tenTDP) { shake('modal-ten'); return; }
+    if (!pendingLatlngs || pendingLatlngs.length < 3) {
+      showStatus('⚠️ Mất dữ liệu điểm, hãy vẽ lại!', 'red'); cancelModal(); return;
+    }
+
+    const btn = document.getElementById('modal-save-btn');
+    btn.innerHTML = '<span class="spinner"></span> Đang lưu…';
+    btn.disabled  = true;
+
+    const color  = POLY_COLORS[colorIndex % POLY_COLORS.length];
+    colorIndex++;
+
+    const latlngs = pendingLatlngs;
+    const area    = calcAreaFromLatLngs(latlngs);
+    const coords  = latlngsToGeoCoords(latlngs);  // [lng, lat] closed ring
+    const fbKey   = idTDP.replace(/[.#$\[\]/]/g, '_');
+    const now     = new Date().toISOString();
+
+    const tdpObj = {
+      id_to_dan_pho:    idTDP,
+      ten_to:           tenTDP,
+      can_bo_phu_trach: canBo,
+      don_vi:           document.getElementById('inp-donvi').value.trim() || 'Liên Chiểu, Đà Nẵng',
+      timestamp:        now,
+      area_m2:          Math.round(area),
+      color,
+      geometry: { type: 'Polygon', coordinates: [coords] },
+    };
+
+    // Draw final polygon on map
+    const poly = L.polygon(latlngs, {
+      color, fillColor: color, fillOpacity: 0.18, weight: 2.5,
+    });
+    poly.options._fbKey = fbKey;
+    updateLayerPopup(poly, tdpObj);
+    addAreaTooltip(poly, area, tenTDP);
+    drawnItems.addLayer(poly);
+
+    // Make polygon vertices editable on click
+    poly.on('click', () => {
+      // Show edit option in popup
+    });
+
+    // Firebase / fallback
+    if (firebaseReady && db) {
+      try {
+        await db.ref(`tdp_boundaries/${fbKey}`).set(tdpObj);
+        showStatus('✅ Đã lưu lên Firebase!', 'green');
+      } catch (err) {
+        allTDPs[fbKey] = tdpObj;
+        saveLocal();
+        showStatus('⚠️ Lỗi Firebase – lưu local', 'yellow');
+      }
+    } else {
+      allTDPs[fbKey] = tdpObj;
+      saveLocal();
+      showStatus('💾 Đã lưu local (Firebase chưa kết nối)', 'yellow');
+    }
+
+    document.getElementById('modal-backdrop').classList.remove('visible');
+    btn.innerHTML = '💾 Lưu lên Firebase';
+    btn.disabled  = false;
+    pendingLatlngs = null;
+    clearModalFields();
+    refreshTDPList();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  POPUP & TOOLTIP
+  // ════════════════════════════════════════════════════════════
+  function updateLayerPopup(layer, tdp) {
+    if (!tdp) return;
+    const area = tdp.area_m2 ? `${tdp.area_m2.toLocaleString('vi-VN')} m²` : '—';
+    const ts   = tdp.timestamp ? new Date(tdp.timestamp).toLocaleString('vi-VN') : '—';
+    layer.bindPopup(`
+      <div style="min-width:210px;font-family:Inter,sans-serif">
+        <p style="font-weight:700;font-size:15px;margin:0 0 6px 0;color:#93c5fd">${tdp.ten_to}</p>
+        <table style="font-size:12px;width:100%;border-collapse:collapse">
+          <tr><td style="color:#9ca3af;padding:2px 0">📋 Mã TDP</td><td style="padding:2px 0 2px 10px;color:#e5e7eb">${tdp.id_to_dan_pho}</td></tr>
+          <tr><td style="color:#9ca3af;padding:2px 0">👮 Cán bộ</td><td style="padding:2px 0 2px 10px;color:#e5e7eb">${tdp.can_bo_phu_trach}</td></tr>
+          <tr><td style="color:#9ca3af;padding:2px 0">📐 Diện tích</td><td style="padding:2px 0 2px 10px;color:#34d399">${area}</td></tr>
+          <tr><td style="color:#9ca3af;padding:2px 0">🕐 Thời gian</td><td style="padding:2px 0 2px 10px;color:#e5e7eb">${ts}</td></tr>
+          <tr><td style="color:#9ca3af;padding:2px 0">🌐 Hệ tọa độ</td><td style="padding:2px 0 2px 10px;color:#e5e7eb">EPSG:4326</td></tr>
+        </table>
+        <button onclick="deleteTDP('${tdp.id_to_dan_pho.replace(/'/g,'')}')"
+          style="margin-top:10px;width:100%;padding:6px;background:#7f1d1d;color:#fca5a5;border:none;border-radius:6px;font-size:12px;cursor:pointer">
+          🗑️ Xóa TDP này
+        </button>
+      </div>
+    `, { maxWidth: 290 });
+  }
+
+  function addAreaTooltip(layer, area, name) {
+    if (!layer.getBounds) return;
+    layer.bindTooltip(`<b>${name}</b><br>${formatArea(area)}`,
+      { permanent: true, direction: 'center', className: 'area-tooltip', interactive: false });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  DELETE TDP
+  // ════════════════════════════════════════════════════════════
+  function deleteTDP(idTDP) {
+    if (!confirm(`Xóa TDP "${idTDP}" khỏi Firebase và bản đồ?`)) return;
+    const fbKey = idTDP.replace(/[.#$\[\]/]/g, '_');
+
+    // Remove from map
+    drawnItems.eachLayer(layer => {
+      if (layer.options._fbKey === fbKey || layer.options._fbKey === idTDP) {
+        drawnItems.removeLayer(layer);
+      }
+    });
+
+    if (firebaseReady && db) {
+      db.ref(`tdp_boundaries/${fbKey}`).remove();
+      showStatus('🗑️ Đã xóa TDP khỏi Firebase', 'red');
+    } else {
+      delete allTDPs[fbKey];
+      saveLocal();
+      showStatus('🗑️ Đã xóa TDP (local)', 'red');
+    }
+
+    delete allTDPs[fbKey];
+    refreshTDPList();
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  FIREBASE REALTIME SYNC
+  // ════════════════════════════════════════════════════════════
+  function setupFirebaseSync() {
+    if (!firebaseReady || !db) {
+      setConnStatus(false, 'Firebase chưa cấu hình – chạy offline');
+      loadLocal();
+      return;
+    }
+
+    db.ref('tdp_boundaries').on('value', snap => {
+      const data = snap.val() || {};
+      setConnStatus(true, `Đã kết nối · ${Object.keys(data).length} TDP`);
+
+      drawnItems.clearLayers();
+      allTDPs    = {};
+      colorIndex = 0;
+
+      Object.entries(data).forEach(([fbKey, tdp]) => {
+        if (!tdp?.geometry?.coordinates) return;
+        const latlngs = tdp.geometry.coordinates[0].map(c => [c[1], c[0]]);
+        const color   = tdp.color || POLY_COLORS[colorIndex % POLY_COLORS.length];
+        colorIndex++;
+
+        const poly = L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.18, weight: 2.5 });
+        poly.options._fbKey = fbKey;
+        updateLayerPopup(poly, tdp);
+        addAreaTooltip(poly, tdp.area_m2 || 0, tdp.ten_to);
+        drawnItems.addLayer(poly);
+        allTDPs[fbKey] = tdp;
+      });
+      refreshTDPList();
+    }, err => {
+      setConnStatus(false, 'Lỗi: ' + err.message);
+      loadLocal();
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  LOCAL STORAGE
+  // ════════════════════════════════════════════════════════════
+  function saveLocal() { localStorage.setItem(LS_KEY, JSON.stringify(allTDPs)); }
+
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      drawnItems.clearLayers(); allTDPs = {}; colorIndex = 0;
+      Object.entries(data).forEach(([fbKey, tdp]) => {
+        if (!tdp?.geometry?.coordinates) return;
+        const latlngs = tdp.geometry.coordinates[0].map(c => [c[1], c[0]]);
+        const color   = tdp.color || POLY_COLORS[colorIndex % POLY_COLORS.length];
+        colorIndex++;
+        const poly = L.polygon(latlngs, { color, fillColor: color, fillOpacity: 0.18, weight: 2.5 });
+        poly.options._fbKey = fbKey;
+        updateLayerPopup(poly, tdp);
+        addAreaTooltip(poly, tdp.area_m2 || 0, tdp.ten_to);
+        drawnItems.addLayer(poly);
+        allTDPs[fbKey] = tdp;
+      });
+      refreshTDPList();
+    } catch(e) { console.error(e); }
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  GPS LOCATE
+  // ════════════════════════════════════════════════════════════
+  function locateMe() {
+    const btn = document.getElementById('btn-locate');
+    btn.innerHTML = '<span class="spinner" style="width:20px;height:20px"></span>';
+    if (!navigator.geolocation) { showStatus('❌ Trình duyệt không hỗ trợ GPS', 'red'); btn.innerHTML='📍'; return; }
+
+    navigator.geolocation.getCurrentPosition(pos => {
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      map.setView([lat, lng], 18, { animate: true });
+
+      const icon = L.divIcon({ className:'gps-pulse-icon', html:'<div></div>', iconSize:[20,20], iconAnchor:[10,10] });
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker([lat, lng], { icon, zIndexOffset:1000 })
+        .addTo(map)
+        .bindPopup(`<div style="font-family:Inter,sans-serif;font-size:13px">
+          <b style="color:#60a5fa">📍 Vị trí của bạn</b><br>
+          Lat: <code>${lat.toFixed(6)}</code><br>
+          Lng: <code>${lng.toFixed(6)}</code><br>
+          Độ chính xác: ~${Math.round(accuracy)} m
+        </div>`)
+        .openPopup();
+
+      L.circle([lat,lng], { radius:accuracy, color:'#3b82f6', fillColor:'#3b82f6', fillOpacity:0.05, weight:1, dashArray:'5 5' }).addTo(map);
+      showStatus(`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} (±${Math.round(accuracy)}m)`, 'green');
+      btn.innerHTML = '📍';
+    }, err => {
+      const msgs = { 1:'Từ chối quyền GPS', 2:'Không xác định được vị trí', 3:'Hết thời gian chờ' };
+      showStatus('❌ ' + (msgs[err.code] || 'Lỗi GPS'), 'red');
+      btn.innerHTML = '📍';
+    }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  LAYER SWITCHER
+  // ════════════════════════════════════════════════════════════
+  function setLayer(name) {
+    if (!TILES[name]) return;
+    map.removeLayer(currentTile);
+    currentTile = TILES[name];
+    currentTile.addTo(map);
+    document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active-layer'));
+    const btn = document.getElementById('btn-' + name);
+    if (btn) btn.classList.add('active-layer');
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  TDP LIST PANEL
+  // ════════════════════════════════════════════════════════════
+  function refreshTDPList() {
+    const list  = document.getElementById('tdp-list');
+    const count = document.getElementById('tdp-count');
+    const items = Object.values(allTDPs);
+    count.textContent = items.length;
+
+    if (!items.length) {
+      list.innerHTML = '<p class="text-xs text-gray-500 text-center py-4">Chưa có TDP nào.</p>';
+      return;
+    }
+
+    items.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+    list.innerHTML = items.map(tdp => `
+      <div class="tdp-item" onclick="focusTDP('${(tdp.id_to_dan_pho||'').replace(/'/g,'')}')">
+        <div class="flex items-center gap-2">
+          <span style="width:10px;height:10px;border-radius:50%;background:${tdp.color||'#3b82f6'};flex-shrink:0;display:inline-block"></span>
+          <span class="font-semibold text-sm truncate">${tdp.ten_to}</span>
+        </div>
+        <div class="text-xs text-gray-400 mt-1 ml-4">${tdp.id_to_dan_pho} · ${tdp.area_m2 ? tdp.area_m2.toLocaleString('vi-VN')+' m²' : '—'}</div>
+        <div class="text-xs text-gray-500 ml-4">👮 ${tdp.can_bo_phu_trach}</div>
+      </div>
+    `).join('');
+  }
+
+  function focusTDP(idTDP) {
+    const fbKey = idTDP.replace(/[.#$\[\]/]/g, '_');
+    drawnItems.eachLayer(layer => {
+      if (layer.options._fbKey === fbKey || layer.options._fbKey === idTDP) {
+        if (layer.getBounds) map.fitBounds(layer.getBounds(), { padding:[40,40] });
+        layer.openPopup();
+        closeSidebar();
+      }
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  EXPORT GEOJSON
+  // ════════════════════════════════════════════════════════════
+  function exportGeoJSON() {
+    const features = Object.values(allTDPs).map(tdp => ({
+      type: 'Feature',
+      properties: {
+        id_to_dan_pho: tdp.id_to_dan_pho, ten_to: tdp.ten_to,
+        can_bo_phu_trach: tdp.can_bo_phu_trach, don_vi: tdp.don_vi,
+        area_m2: tdp.area_m2, timestamp: tdp.timestamp,
+      },
+      geometry: tdp.geometry,
+    }));
+    const blob = new Blob([JSON.stringify({ type:'FeatureCollection', crs:{type:'name',properties:{name:'EPSG:4326'}}, features }, null, 2)], { type:'application/geo+json' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `TDP_LienChieu_${new Date().toISOString().slice(0,10)}.geojson` });
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showStatus('📥 Đã xuất GeoJSON!', 'green');
+  }
+
+  function clearAll() {
+    if (!confirm('Xóa hết TDP local?')) return;
+    drawnItems.clearLayers(); allTDPs = {}; colorIndex = 0;
+    localStorage.removeItem(LS_KEY);
+    refreshTDPList();
+    showStatus('🗑️ Đã xóa local', 'red');
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  HELPERS
+  // ════════════════════════════════════════════════════════════
+  function calcAreaFromLatLngs(latlngs) {
+    const R = 6371000;
+    let area = 0, n = latlngs.length;
+    for (let i = 0; i < n; i++) {
+      const j = (i+1) % n;
+      const lat1 = latlngs[i].lat * Math.PI/180, lat2 = latlngs[j].lat * Math.PI/180;
+      const lng1 = latlngs[i].lng * Math.PI/180, lng2 = latlngs[j].lng * Math.PI/180;
+      area += (lng2 - lng1) * (2 + Math.sin(lat1) + Math.sin(lat2));
+    }
+    return Math.abs(area * R * R / 2);
+  }
+
+  function formatArea(m2) {
+    if (m2 >= 1_000_000) return (m2/1_000_000).toFixed(2)+' km²';
+    if (m2 >= 10_000)    return (m2/10_000).toFixed(2)+' ha';
+    return m2.toLocaleString('vi-VN', { maximumFractionDigits:0 })+' m²';
+  }
+
+  function latlngsToGeoCoords(latlngs) {
+    const ring = latlngs.map(p => [parseFloat(p.lng.toFixed(7)), parseFloat(p.lat.toFixed(7))]);
+    if (ring.length && (ring[0][0] !== ring[ring.length-1][0] || ring[0][1] !== ring[ring.length-1][1])) ring.push(ring[0]);
+    return ring;
+  }
+
+  function setConnStatus(ok, msg) {
+    document.getElementById('conn-dot').className = `w-2 h-2 rounded-full ${ok ? 'bg-green-400' : 'bg-red-400'}`;
+    document.getElementById('conn-text').textContent = msg;
+    const badge = document.getElementById('rt-badge');
+    badge.className = `flex items-center gap-1.5 text-xs flex-shrink-0 ${ok ? 'text-green-400' : 'text-red-400'}`;
+    const dot = badge.querySelector('span');
+    if (dot) dot.className = `w-2 h-2 rounded-full ${ok ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`;
+  }
+
+  let _statusTimer;
+  function showStatus(msg, color='green') {
+    const el = document.getElementById('status-badge');
+    const map = { green:'#065f46|#d1fae5', blue:'#1e3a5f|#bfdbfe', yellow:'#78350f|#fef08a', red:'#7f1d1d|#fecaca' };
+    const [bg, text] = (map[color]||map.green).split('|');
+    Object.assign(el.style, { background:bg, color:text, opacity:'1' });
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(_statusTimer);
+    _statusTimer = setTimeout(() => { el.style.opacity='0'; setTimeout(()=>el.classList.add('hidden'),400); }, 3500);
+  }
+
+  function shake(id) {
+    const el = document.getElementById(id);
+    el.style.borderColor = '#ef4444';
+    el.animate([{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}], { duration:300, iterations:2 });
+    setTimeout(() => el.style.borderColor = '', 600);
+  }
+
+  function toggleSidebar() {
+    const open = document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('overlay').classList.toggle('visible', open);
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('visible');
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  BOOT
+  // ════════════════════════════════════════════════════════════
+  initMap();
+  setupFirebaseSync();
+  </script>
+</body>
+</html>
