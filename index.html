@@ -987,10 +987,42 @@
 
         const layers = [];
         let featureCount = 0;
+        let trashCount = 0;
+
+        // ── Helper: Check if name is in whitelist ────────────
+        const isWhiteListed = (name) => {
+          if (!name) return false;
+          const n = name.toLowerCase().trim();
+          
+          // Pattern: Tổ 1 -> 83
+          const toMatch = n.match(/^tổ\s*(\d+)$/);
+          if (toMatch) {
+            const num = parseInt(toMatch[1]);
+            return num >= 1 && num <= 83;
+          }
+
+          // Pattern: Quan Nam 1 -> 6
+          const qnMatch = n.match(/^quan nam\s*([1-6])$/);
+          if (qnMatch) return true;
+
+          // Specific Hòa Liên villages
+          const villages = [
+            "hưởng phước", "hiền phước", "tân ninh", 
+            "vân dương 1", "vân dương 2", "trung sơn"
+          ];
+          return villages.includes(n);
+        };
 
         // ── Parse Placemarks ──────────────────────────────────
         kmlDoc.querySelectorAll('Placemark').forEach(pm => {
           const name  = pm.querySelector('name')?.textContent?.trim() || '';
+          
+          // FILTER: Skip if not in whitelist
+          if (!isWhiteListed(name)) {
+            trashCount++;
+            return; 
+          }
+
           const desc  = pm.querySelector('description')?.textContent?.trim() || '';
           const style = getKMLStyle(pm, kmlDoc);
 
@@ -1047,10 +1079,14 @@
         const statusEl = document.getElementById('kml-status');
         statusEl.classList.remove('hidden');
         document.getElementById('kml-status-text').textContent =
-          `✅ ${file.name} · ${featureCount} đối tượng`;
+          `✅ ${file.name} · ${featureCount} vùng hợp lệ`;
         document.getElementById('btn-kml-toggle').textContent = '👁 Ẩn';
 
-        showStatus(`📂 Đã load KML: ${featureCount} đối tượng. <a href="#" onclick="removeKMLLayer(); return false;" class="underline ml-2 font-bold">HOÀN TÁC</a>`, 'blue');
+        let msg = `📂 Đã load ${featureCount} vùng.`;
+        if (trashCount > 0) msg += ` (Đã lọc bỏ ${trashCount} vùng rác)`;
+        msg += ` <a href="#" onclick="removeKMLLayer(); return false;" class="underline ml-2 font-bold">HOÀN TÁC</a>`;
+        
+        showStatus(msg, 'blue');
 
         // Reset input so same file can be re-imported
         event.target.value = '';
