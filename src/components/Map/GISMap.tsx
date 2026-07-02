@@ -1,13 +1,24 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, useMap, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, GeoJSON, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import '@geoman-io/leaflet-geoman-free';
 // @ts-ignore
 import * as turf from '@turf/turf';
 import ZoneModal from './ZoneModal';
-import { saveZone, getZones } from '@/app/actions';
+import PoiModal from './PoiModal';
+import { saveZone, getZones, savePoi, getPois } from '@/app/actions';
+
+// Fix default Leaflet marker icon asset resolution paths in Next.js
+if (typeof window !== 'undefined') {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  });
+}
 
 // Styles for Leaflet/Geoman
 import 'leaflet/dist/leaflet.css';
@@ -18,8 +29,32 @@ const POLY_COLORS = [
   '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#a78bfa'
 ];
 
+// Helper to construct custom HTML icons based on type
+const getPoiIcon = (type: string) => {
+  const emojis: Record<string, string> = {
+    warning: '⚠️',
+    info: 'ℹ️',
+    camera: '📹',
+    fire: '🚒'
+  };
+  return L.divIcon({
+    html: `<div class="flex items-center justify-center text-lg bg-slate-950 border border-white/20 rounded-full w-8 h-8 shadow-2xl">${emojis[type] || '📍'}</div>`,
+    className: 'custom-poi-icon',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16]
+  });
+};
+
 // Custom component to initialize Geoman and handle events
-const MapController = ({ onZoneCreated }: { onZoneCreated: (layer: any) => void }) => {
+const MapController = ({ 
+  onZoneCreated, 
+  onPoiCreated,
+  onDrawingStateChange
+}: { 
+  onZoneCreated: (layer: any) => void;
+  onPoiCreated: (layer: any) => void;
+  onDrawingStateChange: (isDrawing: boolean) => void;
+}) => {
   const map = useMap();
 
   useEffect(() => {
@@ -30,21 +65,28 @@ const MapController = ({ onZoneCreated }: { onZoneCreated: (layer: any) => void 
       return;
     }
 
-    // Enable Geoman with full suite of tools including Text for annotations
+    // Enable Geoman with full suite of tools
     map.pm.addControls({
       position: 'topleft',
       drawMarker: true,
-      drawCircleMarker: true,
-      drawPolyline: true,
-      drawRectangle: true,
+      drawCircleMarker: false,
+      drawPolyline: false,
+      drawRectangle: false,
       drawPolygon: true,
-      drawCircle: true,
-      drawText: true, // Crucial for annotations/notes
+      drawCircle: false,
+      drawText: false,
       editMode: true,
       dragMode: true,
       cutPolygon: true,
       removalMode: true,
-      rotateMode: true,
+      rotateMode: false,
+    });
+
+    const drawingIcon = L.divIcon({
+      html: `<div class="flex items-center justify-center text-lg bg-slate-955 border border-white/20 rounded-full w-8 h-8 shadow-2xl">📍</div>`,
+      className: 'custom-drawing-icon',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
     });
 
     map.pm.setGlobalOptions({
@@ -53,28 +95,52 @@ const MapController = ({ onZoneCreated }: { onZoneCreated: (layer: any) => void 
       allowSelfIntersection: false,
       templineStyle: { color: '#fbbf24', dashArray: '5,5' },
       hintlineStyle: { color: '#fbbf24', dashArray: '5,5' },
+      markerStyle: {
+        icon: drawingIcon
+      }
     });
 
     // Handle object creation
     const handleCreate = (e: any) => {
       const { layer } = e;
-      // If it's a polygon, we trigger the data entry workflow
       if (layer instanceof L.Polygon) {
         onZoneCreated(layer);
+      } else if (layer instanceof L.Marker) {
+        onPoiCreated(layer);
       }
     };
 
     map.on('pm:create', handleCreate);
 
+    const handleDrawStart = () => onDrawingStateChange(true);
+    const handleDrawEnd = () => onDrawingStateChange(false);
+
+    map.on('pm:drawstart', handleDrawStart);
+    map.on('pm:drawend', handleDrawEnd);
+
     // Listen for custom start drawing event
     const handleStartDrawing = () => {
       if (map.pm) {
         map.pm.enableDraw('Polygon');
-      } else {
-        console.error('Không thể bắt đầu vẽ: Geoman chưa sẵn sàng');
       }
     };
     window.addEventListener('start-drawing-polygon', handleStartDrawing);
+
+    // Listen for custom start drawing marker event
+    const handleStartDrawingMarker = () => {
+      if (map.pm) {
+        map.pm.enableDraw('Marker');
+      }
+    };
+    window.addEventListener('start-drawing-marker', handleStartDrawingMarker);
+
+    // Listen for custom disable drawing event
+    const handleDisableDraw = () => {
+      if (map.pm) {
+        map.pm.disableDraw();
+      }
+    };
+    window.addEventListener('map-disable-draw', handleDisableDraw);
 
     // Listen for fly-to event from Sidebar
     const handleFlyTo = (e: any) => {
@@ -87,11 +153,15 @@ const MapController = ({ onZoneCreated }: { onZoneCreated: (layer: any) => void 
 
     return () => {
       window.removeEventListener('start-drawing-polygon', handleStartDrawing);
+      window.removeEventListener('start-drawing-marker', handleStartDrawingMarker);
+      window.removeEventListener('map-disable-draw', handleDisableDraw);
       window.removeEventListener('map-fly-to', handleFlyTo);
       map.off('pm:create', handleCreate);
+      map.off('pm:drawstart', handleDrawStart);
+      map.off('pm:drawend', handleDrawEnd);
       if (map.pm) map.pm.removeControls();
     };
-  }, [map, onZoneCreated]);
+  }, [map, onZoneCreated, onPoiCreated, onDrawingStateChange]);
 
   return null;
 };
@@ -103,16 +173,22 @@ interface GISMapProps {
 
 export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISMapProps) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [poiModalOpen, setPoiModalOpen] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  
   const [currentLayer, setCurrentLayer] = useState<any>(null);
+  const [currentPoiLayer, setCurrentPoiLayer] = useState<any>(null);
+  
   const [initialData, setInitialData] = useState<any>(null);
+  const [poiInitialData, setPoiInitialData] = useState<any>(null);
+  
   const [zones, setZones] = useState<any[]>([]);
-  const [mapLayer, setMapLayer] = useState<'satellite' | 'hybrid' | 'streets' | 'terrain'>('hybrid');
+  const [pois, setPois] = useState<any[]>([]);
+  const [mapLayer, setMapLayer] = useState<'hybrid' | 'streets'>('hybrid');
 
   const LAYER_URLS = {
-    satellite: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
     hybrid: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
     streets: 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    terrain: 'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}'
   };
 
   const fetchZones = useCallback(async () => {
@@ -122,8 +198,20 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     }
   }, []);
 
-  useEffect(() => {
+  const fetchPois = useCallback(async () => {
+    const res = await getPois();
+    if (res.success && res.data) {
+      setPois(res.data);
+    }
+  }, []);
+
+  const refreshAllData = useCallback(() => {
     fetchZones();
+    fetchPois();
+  }, [fetchZones, fetchPois]);
+
+  useEffect(() => {
+    refreshAllData();
 
     const handleLayerChange = (e: any) => {
       if (e.detail && e.detail.layer) {
@@ -131,15 +219,14 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       }
     };
 
-    // Listen for database changes to refresh map layers
-    window.addEventListener('zone-saved', fetchZones);
+    window.addEventListener('zone-saved', refreshAllData);
     window.addEventListener('map-change-layer', handleLayerChange);
 
     return () => {
-      window.removeEventListener('zone-saved', fetchZones);
+      window.removeEventListener('zone-saved', refreshAllData);
       window.removeEventListener('map-change-layer', handleLayerChange);
     };
-  }, [fetchZones]);
+  }, [refreshAllData]);
 
   const handleZoneCreated = useCallback((layer: any) => {
     const geoJson = layer.toGeoJSON();
@@ -155,20 +242,27 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     setModalOpen(true);
   }, []);
 
+  const handlePoiCreated = useCallback((layer: any) => {
+    setCurrentPoiLayer(layer);
+    setPoiInitialData({
+      name: 'Điểm chú ý mới',
+      notes: '',
+      type: 'warning'
+    });
+    setPoiModalOpen(true);
+  }, []);
+
   const handleSaveData = async (data: any) => {
     if (currentLayer) {
       const geoJson = currentLayer.toGeoJSON();
-      
       const res = await saveZone({
         geometry: geoJson.geometry,
         properties: data
       });
 
       if (res.success) {
-        await fetchZones();
-        // Notify other components (like Sidebar) to refresh
+        refreshAllData();
         window.dispatchEvent(new CustomEvent('zone-saved'));
-        // Remove temporary layer because it will now be rendered from the state via GeoJSON component
         currentLayer.remove();
       } else {
         alert('Lỗi khi lưu ranh giới vào CSDL: ' + res.error);
@@ -178,12 +272,39 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     setCurrentLayer(null);
   };
 
-  const handleCloseModal = () => {
-    if (currentLayer) {
-      currentLayer.remove(); // Remove temporary layer if cancelled
+  const handleSavePoi = async (data: any) => {
+    if (currentPoiLayer) {
+      const latlng = currentPoiLayer.getLatLng();
+      const res = await savePoi({
+        geometry: {
+          type: 'Point',
+          coordinates: [latlng.lng, latlng.lat]
+        },
+        properties: data
+      });
+
+      if (res.success) {
+        refreshAllData();
+        window.dispatchEvent(new CustomEvent('zone-saved'));
+        currentPoiLayer.remove();
+      } else {
+        alert('Lỗi khi lưu điểm chú ý vào CSDL: ' + res.error);
+      }
     }
+    setPoiModalOpen(false);
+    setCurrentPoiLayer(null);
+  };
+
+  const handleCloseModal = () => {
+    if (currentLayer) currentLayer.remove();
     setModalOpen(false);
     setCurrentLayer(null);
+  };
+
+  const handleClosePoiModal = () => {
+    if (currentPoiLayer) currentPoiLayer.remove();
+    setPoiModalOpen(false);
+    setCurrentPoiLayer(null);
   };
 
   return (
@@ -218,12 +339,11 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
               layer.bindPopup(`
                 <div class="p-3 min-w-[220px] bg-slate-900 text-white rounded-lg">
                   <h3 class="text-primary font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2">
-                    📍 ${props.name || 'Vùng không tên'}
+                    📍 ${props.name || 'Tổ dân phố'}
                   </h3>
                   <div class="space-y-1 text-xs">
-                    <p><span class="text-white/50">Mã:</span> <span class="font-mono">${props.id || 'N/A'}</span></p>
                     <p><span class="text-white/50">Diện tích:</span> <b>${props.area || 0} ha</b></p>
-                    <p><span class="text-white/50">Phụ trách:</span> ${props.officer || 'Chưa rõ'}</p>
+                    <p><span class="text-white/50">Cán bộ vẽ:</span> ${props.officer || 'Chưa rõ'}</p>
                     <p><span class="text-white/50">Dân số:</span> ${props.population || 0} người / ${props.households || 0} hộ</p>
                     <p><span class="text-white/50">CSKV:</span> ${props.cskv || 'Chưa rõ'}</p>
                     <p><span class="text-white/50">SĐT CSKV:</span> ${props.phone || 'Chưa rõ'}</p>
@@ -234,21 +354,68 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                     </div>
                   ` : ''}
                 </div>
-              `, {
-                className: 'custom-leaflet-popup'
-              });
+              `, { className: 'custom-leaflet-popup' });
             }}
           />
         ))}
+
+        {pois.map((poi, idx) => {
+          const coords = poi.geometry?.coordinates;
+          const props = poi.properties || {};
+          if (!coords || coords.length < 2) return null;
+          return (
+            <Marker
+              key={poi._id || idx}
+              position={[coords[1], coords[0]]}
+              icon={getPoiIcon(props.type)}
+            >
+              <Popup className="custom-leaflet-popup">
+                <div className="p-3 min-w-[200px] bg-slate-950 text-white rounded-xl border border-white/10 shadow-2xl">
+                  <h3 className="text-yellow-400 font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2 text-sm">
+                    {props.type === 'warning' ? '⚠️' : props.type === 'info' ? 'ℹ️' : props.type === 'camera' ? '📹' : '🚒'} {props.name || 'Điểm chú ý'}
+                  </h3>
+                  <p className="text-xs text-white/80 leading-relaxed font-medium py-1">
+                    {props.notes || 'Không có ghi chú.'}
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-white/30 uppercase tracking-widest text-right">
+                    Số hóa GIS
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
         
-        <MapController onZoneCreated={handleZoneCreated} />
+        <MapController 
+          onZoneCreated={handleZoneCreated} 
+          onPoiCreated={handlePoiCreated} 
+          onDrawingStateChange={setIsDrawing}
+        />
       </MapContainer>
+
+      {isDrawing && (
+        <button
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('map-disable-draw'));
+          }}
+          className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-full shadow-2xl flex items-center gap-2 border border-red-500/20 transition-all hover:scale-105 cursor-pointer"
+        >
+          <span>❌</span> Hủy vẽ ranh giới
+        </button>
+      )}
 
       <ZoneModal 
         isOpen={modalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveData}
         initialData={initialData}
+      />
+
+      <PoiModal
+        isOpen={poiModalOpen}
+        onClose={handleClosePoiModal}
+        onSave={handleSavePoi}
+        initialData={poiInitialData}
       />
     </div>
   );

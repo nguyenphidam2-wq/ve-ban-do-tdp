@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar';
 import { Suspense } from 'react';
-import { Navigation } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
 // Dynamically import map with no SSR
 const GISMap = dynamic(() => import('@/components/Map/GISMap'), {
@@ -31,8 +31,8 @@ export default function Home() {
         <GISMap />
       </div>
 
-      {/* Floating UI Elements (Overlays) */}
-      <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+      {/* Floating UI Elements (Overlays) - Hidden on Mobile */}
+      <div className="absolute top-4 right-4 z-[1000] hidden md:flex flex-col gap-2">
         <div className="glass-morphism p-3 rounded-xl flex items-center gap-4 shadow-xl">
           <div className="flex flex-col">
             <span className="text-[10px] text-white/40 uppercase font-bold">Chế độ Snapping</span>
@@ -49,16 +49,15 @@ export default function Home() {
         </div>
       </div>
 
-
       {/* Floating Action Button */}
-      <div className="absolute bottom-10 right-10 z-[1000]">
+      <div className="absolute bottom-6 right-6 md:bottom-10 md:right-10 z-[1000]">
         <button 
           onClick={() => {
             window.dispatchEvent(new CustomEvent('start-drawing-polygon'));
           }}
-          className="group relative flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 shadow-primary/40"
+          className="group relative flex items-center justify-center w-14 h-14 md:w-16 md:h-16 bg-primary text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 shadow-primary/40 cursor-pointer"
         >
-          <Navigation className="w-8 h-8 group-hover:rotate-45 transition-transform" />
+          <Pencil className="w-6 h-6 md:w-7 md:h-7 group-hover:-rotate-12 transition-transform" />
           <div className="absolute right-20 bg-slate-900 px-4 py-2 rounded-lg text-sm font-bold border border-white/10 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             Bắt đầu vẽ ngay ✏️
           </div>

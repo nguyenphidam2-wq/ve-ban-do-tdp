@@ -53,8 +53,8 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData }: Zone
               <MapPin className="text-primary w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Thông tin vùng bản vẽ</h2>
-              <p className="text-xs text-white/40">Cập nhật thuộc tính cho đối tượng GIS</p>
+              <h2 className="text-lg font-bold text-white">Nhập thông tin tổ dân phố</h2>
+              <p className="text-xs text-white/40">Cập nhật thuộc tính cho tổ dân phố</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/50 transition-colors">
@@ -64,34 +64,23 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData }: Zone
 
         {/* Body */}
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Mã định danh (ID)</label>
-              <input 
-                value={formData.id}
-                onChange={e => setFormData({ ...formData, id: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
-                placeholder="VD: TDP_01"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Tên vùng/TDP</label>
-              <input 
-                value={formData.name}
-                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
-                placeholder="VD: Tổ dân phố 1"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Tên tổ dân phố (ví dụ: Tổ dân phố 1)</label>
+            <input 
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+              placeholder="VD: Tổ dân phố 1"
+            />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Cán bộ phụ trách</label>
+            <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Họ tên cán bộ vẽ</label>
             <input 
               value={formData.officer}
               onChange={e => setFormData({ ...formData, officer: e.target.value })}
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
-              placeholder="Họ và tên cán bộ"
+              placeholder="Họ và tên cán bộ vẽ"
             />
           </div>
 

@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Layers, 
   Map as MapIcon, 
-  Settings, 
   ChevronLeft, 
   ChevronRight,
   Database,
@@ -43,6 +42,13 @@ export default function Sidebar() {
   const [activeLayer, setActiveLayer] = useState('hybrid');
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Collapse sidebar by default on mobile devices
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsCollapsed(true);
+    }
+  }, []);
   
   const currentTab = searchParams.get('tab') || 'map';
 
@@ -90,16 +96,38 @@ export default function Sidebar() {
   const navItems = [
     { id: 'map', icon: MapIcon, label: 'Bản đồ số' },
     { id: 'data', icon: Database, label: 'Dữ liệu GIS' },
-    { id: 'settings', icon: Settings, label: 'Cấu hình' },
   ];
 
   return (
-    <aside 
-      className={cn(
-        "fixed left-4 top-4 bottom-4 z-[1000] glass-morphism rounded-2xl transition-all duration-300 flex flex-col shadow-2xl overflow-hidden",
-        isCollapsed ? "w-20" : "w-80"
+    <>
+      {/* Mobile Menu Floating Toggle Button */}
+      {isCollapsed && (
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="fixed top-4 left-4 z-[999] md:hidden w-12 h-12 bg-slate-900/90 border border-white/10 text-white rounded-xl flex items-center justify-center shadow-xl backdrop-blur-md cursor-pointer active:scale-95 transition-transform"
+        >
+          <Layers className="text-primary w-6 h-6 animate-pulse" />
+        </button>
       )}
-    >
+
+      {/* Mobile Backdrop Overlay */}
+      {!isCollapsed && (
+        <div 
+          onClick={() => setIsCollapsed(true)}
+          className="fixed inset-0 z-[998] bg-black/40 backdrop-blur-sm md:hidden animate-in fade-in duration-200"
+        />
+      )}
+
+      <aside 
+        className={cn(
+          "fixed z-[1000] glass-morphism transition-all duration-300 flex flex-col shadow-2xl overflow-hidden",
+          "md:left-4 md:top-4 md:bottom-4 md:rounded-2xl", // Desktop
+          "left-0 top-0 bottom-0", // Mobile
+          isCollapsed 
+            ? "w-0 md:w-20 -translate-x-full md:translate-x-0" 
+            : "w-[85vw] max-w-[320px] md:w-80 translate-x-0"
+        )}
+      >
       {/* Header */}
       <div className="p-6 flex items-center justify-between border-b border-white/10 shrink-0">
         {!isCollapsed && (
@@ -167,9 +195,7 @@ export default function Sidebar() {
                 <div className="grid grid-cols-2 gap-2 pr-1">
                   {[
                     { id: 'hybrid', emoji: '🌍', label: 'Hybrid' },
-                    { id: 'satellite', emoji: '🛰️', label: 'Vệ tinh' },
-                    { id: 'streets', emoji: '🗺️', label: 'Đường phố' },
-                    { id: 'terrain', emoji: '🏔️', label: 'Địa hình' }
+                    { id: 'streets', emoji: '🗺️', label: 'Đường phố' }
                   ].map(layer => (
                     <button
                       key={layer.id}
@@ -192,43 +218,23 @@ export default function Sidebar() {
               </div>
             )}
 
-            {/* List of TDPs */}
+            {/* Digitizing Tools */}
             {!isCollapsed && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-[10px] text-white/40 uppercase font-bold px-1">
-                  <span>Danh sách Tổ Dân Phố</span>
-                  <span>{filteredZones.length} vùng</span>
-                </div>
-                <div className="space-y-2 max-h-[340px] overflow-y-auto custom-scrollbar pr-1">
-                  {filteredZones.length === 0 ? (
-                    <div className="text-xs text-white/30 text-center py-6">
-                      Chưa có ranh giới nào được vẽ
-                    </div>
-                  ) : (
-                    filteredZones.map((zone, idx) => {
-                      const props = zone.properties || {};
-                      return (
-                        <div 
-                          key={zone._id || idx}
-                          onClick={() => handleZoneClick(zone)}
-                          className="p-3 bg-white/5 rounded-xl border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all cursor-pointer group"
-                        >
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-bold text-sm text-white group-hover:text-primary transition-colors">
-                              {props.name || 'Không tên'}
-                            </h4>
-                            <span className="text-[10px] font-mono bg-white/10 text-white/60 px-1.5 py-0.5 rounded">
-                              {props.id || 'N/A'}
-                            </span>
-                          </div>
-                          <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-white/50">
-                            <div>📐 {props.area || 0} ha</div>
-                            <div>👥 {props.population || 0} dân</div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
+                <span className="text-[10px] text-white/40 uppercase font-bold px-1">Công cụ số hóa</span>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('start-drawing-polygon'))}
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] cursor-pointer"
+                  >
+                    ✏️ Vẽ ranh giới Tổ dân phố
+                  </button>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('start-drawing-marker'))}
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-600/20 transition-all hover:scale-[1.02] cursor-pointer"
+                  >
+                    📍 Cắm mốc chú ý (Karaoke, PCCC...)
+                  </button>
                 </div>
               </div>
             )}
@@ -252,6 +258,44 @@ export default function Sidebar() {
             <h3 className="text-sm font-bold text-white uppercase tracking-widest">Dữ liệu GIS</h3>
             <p className="text-xs text-white/50">Quản lý và xuất nhập dữ liệu ranh giới địa bàn quận Liên Chiểu.</p>
             
+            {/* List of TDPs */}
+            {!isCollapsed && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[10px] text-white/40 uppercase font-bold px-1">
+                  <span>Danh sách Tổ Dân Phố đã vẽ</span>
+                  <span>{filteredZones.length} vùng</span>
+                </div>
+                <div className="space-y-2 max-h-[280px] overflow-y-auto custom-scrollbar pr-1">
+                  {filteredZones.length === 0 ? (
+                    <div className="text-xs text-white/30 text-center py-6">
+                      Chưa có ranh giới nào được vẽ
+                    </div>
+                  ) : (
+                    filteredZones.map((zone, idx) => {
+                      const props = zone.properties || {};
+                      return (
+                        <div 
+                          key={zone._id || idx}
+                          onClick={() => handleZoneClick(zone)}
+                          className="p-3 bg-white/5 rounded-xl border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all cursor-pointer group"
+                        >
+                          <div className="flex justify-between items-start">
+                            <h4 className="font-bold text-sm text-white group-hover:text-primary transition-colors">
+                              {props.name || 'Không tên'}
+                            </h4>
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-white/50">
+                            <div>📐 {props.area || 0} ha</div>
+                            <div>👥 {props.population || 0} dân</div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
             {!isCollapsed && (
               <div className="space-y-3 pt-2">
                 <button 
@@ -273,18 +317,13 @@ export default function Sidebar() {
           </div>
         )}
 
-        {currentTab === 'settings' && (
-          <div className="p-6 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-widest">Cấu hình</h3>
-            <p className="text-xs text-white/50">Cấu hình hệ thống và tham số hiển thị.</p>
-          </div>
-        )}
+
       </div>
 
       {/* Collapse Toggle */}
       <button 
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/10 border border-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-primary transition-colors z-50"
+        className="absolute -right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/10 border border-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-primary transition-colors z-50 hidden md:flex"
       >
         {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
@@ -296,5 +335,6 @@ export default function Sidebar() {
         </div>
       )}
     </aside>
+  </>
   );
 }
