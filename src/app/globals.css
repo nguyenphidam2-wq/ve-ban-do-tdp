@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "leaflet/dist/leaflet.css";
+@import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.glass-morphism {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Customizing Leaflet Controls for Dark Theme */
+.leaflet-control-zoom, .leaflet-control-geoman {
+  border: none !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+}
+
+.leaflet-control-zoom a, .leaflet-control-geoman .leaflet-buttons-control-button {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+.leaflet-control-zoom a:hover, .leaflet-control-geoman .leaflet-buttons-control-button:hover {
+  background-color: #334155 !important;
+}
+
+/* Full Screen Map */
+#map-container {
+  height: 100vh;
+  width: 100%;
+}
