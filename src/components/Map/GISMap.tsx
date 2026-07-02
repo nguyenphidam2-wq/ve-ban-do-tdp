@@ -106,6 +106,14 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   const [currentLayer, setCurrentLayer] = useState<any>(null);
   const [initialData, setInitialData] = useState<any>(null);
   const [zones, setZones] = useState<any[]>([]);
+  const [mapLayer, setMapLayer] = useState<'satellite' | 'hybrid' | 'streets' | 'terrain'>('hybrid');
+
+  const LAYER_URLS = {
+    satellite: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    hybrid: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    streets: 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    terrain: 'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}'
+  };
 
   const fetchZones = useCallback(async () => {
     const res = await getZones();
@@ -117,10 +125,19 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   useEffect(() => {
     fetchZones();
 
+    const handleLayerChange = (e: any) => {
+      if (e.detail && e.detail.layer) {
+        setMapLayer(e.detail.layer);
+      }
+    };
+
     // Listen for database changes to refresh map layers
     window.addEventListener('zone-saved', fetchZones);
+    window.addEventListener('map-change-layer', handleLayerChange);
+
     return () => {
       window.removeEventListener('zone-saved', fetchZones);
+      window.removeEventListener('map-change-layer', handleLayerChange);
     };
   }, [fetchZones]);
 
@@ -179,8 +196,9 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         zoomControl={false}
       >
         <TileLayer
+          key={mapLayer}
           attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
-          url="https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+          url={LAYER_URLS[mapLayer]}
           subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
           maxZoom={21}
         />

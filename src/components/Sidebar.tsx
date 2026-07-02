@@ -40,6 +40,7 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [zones, setZones] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeLayer, setActiveLayer] = useState('hybrid');
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -156,6 +157,38 @@ export default function Sidebar() {
                   placeholder="Tìm kiếm tổ dân phố..." 
                   className="bg-transparent border-none outline-none text-sm w-full placeholder:text-white/20 text-white"
                 />
+              </div>
+            )}
+
+            {/* Map Layers */}
+            {!isCollapsed && (
+              <div className="space-y-2">
+                <span className="text-[10px] text-white/40 uppercase font-bold px-1">Lớp bản đồ nền</span>
+                <div className="grid grid-cols-2 gap-2 pr-1">
+                  {[
+                    { id: 'hybrid', emoji: '🌍', label: 'Hybrid' },
+                    { id: 'satellite', emoji: '🛰️', label: 'Vệ tinh' },
+                    { id: 'streets', emoji: '🗺️', label: 'Đường phố' },
+                    { id: 'terrain', emoji: '🏔️', label: 'Địa hình' }
+                  ].map(layer => (
+                    <button
+                      key={layer.id}
+                      onClick={() => {
+                        setActiveLayer(layer.id);
+                        window.dispatchEvent(new CustomEvent('map-change-layer', { detail: { layer: layer.id } }));
+                      }}
+                      className={cn(
+                        "py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all",
+                        activeLayer === layer.id
+                          ? "bg-primary border-primary text-white shadow-lg shadow-primary/20"
+                          : "bg-white/5 border-white/10 text-white/60 hover:border-white/20 hover:text-white"
+                      )}
+                    >
+                      <span>{layer.emoji}</span>
+                      <span>{layer.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
