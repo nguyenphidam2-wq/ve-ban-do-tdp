@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, useMap, GeoJSON, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, GeoJSON, Marker, Popup, Polygon } from 'react-leaflet';
 import L from 'leaflet';
 import '@geoman-io/leaflet-geoman-free';
 // @ts-ignore
@@ -164,6 +164,22 @@ const MapController = ({
 
   return null;
 };
+
+function getPolygonPositions(geometry: any): any {
+  if (!geometry) return [];
+  if (geometry.type === 'Polygon') {
+    return geometry.coordinates.map((ring: any[]) => 
+      ring.map(coord => [coord[1], coord[0]])
+    );
+  } else if (geometry.type === 'MultiPolygon') {
+    return geometry.coordinates.map((polygon: any[][]) => 
+      polygon.map((ring: any[]) => 
+        ring.map(coord => [coord[1], coord[0]])
+      )
+    );
+  }
+  return [];
+}
 
 interface GISMapProps {
   center?: [number, number];
@@ -404,69 +420,73 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           maxZoom={21}
         />
 
-        {showZones && zones.map((zone, idx) => (
-          <GeoJSON
-            key={zone._id || idx}
-            data={zone}
-            pathOptions={{
-              color: POLY_COLORS[idx % POLY_COLORS.length],
-              fillColor: POLY_COLORS[idx % POLY_COLORS.length],
-              fillOpacity: 0.3,
-              weight: 2
-            }}
-          >
-            <Popup className="custom-leaflet-popup">
-              <div className="p-3 min-w-[220px] bg-slate-900 text-white rounded-lg">
-                <h3 className="text-primary font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2">
-                  📍 {zone.properties?.name || 'Tổ dân phố'}
-                </h3>
-                <div className="space-y-1 text-xs">
-                  <p><span className="text-white/50">Diện tích:</span> <b>{zone.properties?.area || 0} ha</b></p>
-                  <p><span className="text-white/50">Cán bộ vẽ:</span> {zone.properties?.officer || 'Chưa rõ'}</p>
-                  <p><span className="text-white/50">Dân số:</span> {zone.properties?.population || 0} người / {zone.properties?.households || 0} hộ</p>
-                  <p><span className="text-white/50">CSKV:</span> {zone.properties?.cskv || 'Chưa rõ'}</p>
-                  <p><span className="text-white/50">SĐT CSKV:</span> {zone.properties?.phone || 'Chưa rõ'}</p>
-                </div>
-                {zone.properties?.notes && (
-                  <div className="mt-3 pt-2 border-t border-white/10 italic text-white/70 text-[11px] mb-2">
-                    "{zone.properties.notes}"
+        {showZones && zones.map((zone, idx) => {
+          const positions = getPolygonPositions(zone.geometry);
+          if (!positions || positions.length === 0) return null;
+          return (
+            <Polygon
+              key={zone._id || idx}
+              positions={positions}
+              pathOptions={{
+                color: POLY_COLORS[idx % POLY_COLORS.length],
+                fillColor: POLY_COLORS[idx % POLY_COLORS.length],
+                fillOpacity: 0.3,
+                weight: 2
+              }}
+            >
+              <Popup className="custom-leaflet-popup">
+                <div className="p-3 min-w-[220px] bg-slate-900 text-white rounded-lg">
+                  <h3 className="text-primary font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2">
+                    📍 {zone.properties?.name || 'Tổ dân phố'}
+                  </h3>
+                  <div className="space-y-1 text-xs">
+                    <p><span className="text-white/50">Diện tích:</span> <b>{zone.properties?.area || 0} ha</b></p>
+                    <p><span className="text-white/50">Cán bộ vẽ:</span> {zone.properties?.officer || 'Chưa rõ'}</p>
+                    <p><span className="text-white/50">Dân số:</span> {zone.properties?.population || 0} người / {zone.properties?.households || 0} hộ</p>
+                    <p><span className="text-white/50">CSKV:</span> {zone.properties?.cskv || 'Chưa rõ'}</p>
+                    <p><span className="text-white/50">SĐT CSKV:</span> {zone.properties?.phone || 'Chưa rõ'}</p>
                   </div>
-                )}
-                <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setIsEdit(true);
-                      setInitialData({
-                        _id: zone._id,
-                        ...zone.properties
-                      });
-                      setModalOpen(true);
-                    }}
-                    className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
-                  >
-                    ✏️ Sửa
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
-                        const res = await deleteZone(zone._id);
-                        if (res.success) {
-                          refreshAllData();
-                          window.dispatchEvent(new CustomEvent('zone-saved'));
-                        } else {
-                          alert('Lỗi khi xóa: ' + res.error);
+                  {zone.properties?.notes && (
+                    <div className="mt-3 pt-2 border-t border-white/10 italic text-white/70 text-[11px] mb-2">
+                      "{zone.properties.notes}"
+                    </div>
+                  )}
+                  <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setIsEdit(true);
+                        setInitialData({
+                          _id: zone._id,
+                          ...zone.properties
+                        });
+                        setModalOpen(true);
+                      }}
+                      className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      ✏️ Sửa
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
+                          const res = await deleteZone(zone._id);
+                          if (res.success) {
+                            refreshAllData();
+                            window.dispatchEvent(new CustomEvent('zone-saved'));
+                          } else {
+                            alert('Lỗi khi xóa: ' + res.error);
+                          }
                         }
-                      }
-                    }}
-                    className="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
-                  >
-                    🗑️ Xóa
-                  </button>
+                      }}
+                      className="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
+                    >
+                      🗑️ Xóa
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </Popup>
-          </GeoJSON>
-        ))}
+              </Popup>
+            </Polygon>
+          );
+        })}
 
         {showPois && pois.map((poi, idx) => {
           const coords = poi.geometry?.coordinates;
