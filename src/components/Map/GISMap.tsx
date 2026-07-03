@@ -8,7 +8,7 @@ import '@geoman-io/leaflet-geoman-free';
 import * as turf from '@turf/turf';
 import ZoneModal from './ZoneModal';
 import PoiModal from './PoiModal';
-import { saveZone, getZones, savePoi, getPois } from '@/app/actions';
+import { saveZone, getZones, savePoi, getPois, deleteZone, deletePoi } from '@/app/actions';
 
 // Fix default Leaflet marker icon asset resolution paths in Next.js
 if (typeof window !== 'undefined') {
@@ -219,10 +219,24 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       }
     };
 
+    // Attach global delete handler for raw HTML popups
+    (window as any).deleteZoneFromMap = async (id: string) => {
+      if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
+        const res = await deleteZone(id);
+        if (res.success) {
+          refreshAllData();
+          window.dispatchEvent(new CustomEvent('zone-saved'));
+        } else {
+          alert('Lỗi khi xóa: ' + res.error);
+        }
+      }
+    };
+
     window.addEventListener('zone-saved', refreshAllData);
     window.addEventListener('map-change-layer', handleLayerChange);
 
     return () => {
+      delete (window as any).deleteZoneFromMap;
       window.removeEventListener('zone-saved', refreshAllData);
       window.removeEventListener('map-change-layer', handleLayerChange);
     };
@@ -349,10 +363,15 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                     <p><span class="text-white/50">SĐT CSKV:</span> ${props.phone || 'Chưa rõ'}</p>
                   </div>
                   ${props.notes ? `
-                    <div class="mt-3 pt-2 border-t border-white/10 italic text-white/70 text-[11px]">
+                    <div class="mt-3 pt-2 border-t border-white/10 italic text-white/70 text-[11px] mb-2">
                       "${props.notes}"
                     </div>
                   ` : ''}
+                  <div class="mt-3 pt-2 border-t border-white/10">
+                    <button onclick="window.deleteZoneFromMap('${(feature as any)._id}')" class="w-full py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
+                      🗑️ Xóa ranh giới này
+                    </button>
+                  </div>
                 </div>
               `, { className: 'custom-leaflet-popup' });
             }}
@@ -377,6 +396,24 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                   <p className="text-xs text-white/80 leading-relaxed font-medium py-1">
                     {props.notes || 'Không có ghi chú.'}
                   </p>
+                  <div className="mt-3 pt-2 border-t border-white/10">
+                    <button 
+                      onClick={async () => {
+                        if (confirm('Bạn có chắc chắn muốn xóa mốc ghi chú này không?')) {
+                          const res = await deletePoi(poi._id);
+                          if (res.success) {
+                            refreshAllData();
+                            window.dispatchEvent(new CustomEvent('zone-saved'));
+                          } else {
+                            alert('Lỗi khi xóa: ' + res.error);
+                          }
+                        }
+                      }}
+                      className="w-full py-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
+                    >
+                      🗑️ Xóa điểm mốc này
+                    </button>
+                  </div>
                   <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-white/30 uppercase tracking-widest text-right">
                     Số hóa GIS
                   </div>

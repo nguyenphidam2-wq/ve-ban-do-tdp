@@ -59,3 +59,27 @@ export async function getPois() {
     return { success: false, error: error.message };
   }
 }
+
+export async function deleteZone(id: string) {
+  try {
+    await dbConnect();
+    await Zone.findByIdAndDelete(id);
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting zone:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deletePoi(id: string) {
+  try {
+    await dbConnect();
+    await POI.findByIdAndDelete(id);
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting POI:', error);
+    return { success: false, error: error.message };
+  }
+}

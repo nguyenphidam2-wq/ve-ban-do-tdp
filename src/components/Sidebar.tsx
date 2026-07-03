@@ -9,11 +9,12 @@ import {
   ChevronRight,
   Database,
   Search,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { getZones } from '@/app/actions';
+import { getZones, deleteZone } from '@/app/actions';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -279,10 +280,28 @@ export default function Sidebar() {
                           onClick={() => handleZoneClick(zone)}
                           className="p-3 bg-white/5 rounded-xl border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all cursor-pointer group"
                         >
-                          <div className="flex justify-between items-start">
+                          <div className="flex justify-between items-center w-full">
                             <h4 className="font-bold text-sm text-white group-hover:text-primary transition-colors">
                               {props.name || 'Không tên'}
                             </h4>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Bạn có chắc chắn muốn xóa ${props.name || 'Tổ dân phố này'} không?`)) {
+                                  const res = await deleteZone(zone._id);
+                                  if (res.success) {
+                                    fetchZones();
+                                    window.dispatchEvent(new CustomEvent('zone-saved'));
+                                  } else {
+                                    alert('Lỗi khi xóa: ' + res.error);
+                                  }
+                                }
+                              }}
+                              className="p-1 text-white/40 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                              title="Xóa ranh giới"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                           <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-white/50">
                             <div>📐 {props.area || 0} ha</div>
