@@ -41,6 +41,18 @@ export default function Sidebar() {
   const [zones, setZones] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeLayer, setActiveLayer] = useState('streets');
+  const [showZones, setShowZones] = useState(true);
+  const [showPois, setShowPois] = useState(true);
+
+  const handleToggleZones = (visible: boolean) => {
+    setShowZones(visible);
+    window.dispatchEvent(new CustomEvent('map-toggle-zones', { detail: { visible } }));
+  };
+
+  const handleTogglePois = (visible: boolean) => {
+    setShowPois(visible);
+    window.dispatchEvent(new CustomEvent('map-toggle-pois', { detail: { visible } }));
+  };
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -205,7 +217,7 @@ export default function Sidebar() {
                         window.dispatchEvent(new CustomEvent('map-change-layer', { detail: { layer: layer.id } }));
                       }}
                       className={cn(
-                        "py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all",
+                        "py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer",
                         activeLayer === layer.id
                           ? "bg-primary border-primary text-white shadow-lg shadow-primary/20"
                           : "bg-white/5 border-white/10 text-white/60 hover:border-white/20 hover:text-white"
@@ -215,6 +227,28 @@ export default function Sidebar() {
                       <span>{layer.label}</span>
                     </button>
                   ))}
+                </div>
+
+                {/* Layer visibility toggles */}
+                <div className="pt-3 space-y-2 border-t border-white/5 flex flex-col">
+                  <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white cursor-pointer select-none transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={showZones}
+                      onChange={(e) => handleToggleZones(e.target.checked)}
+                      className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer accent-primary" 
+                    />
+                    <span>Hiện ranh giới Tổ dân phố</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white cursor-pointer select-none transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={showPois}
+                      onChange={(e) => handleTogglePois(e.target.checked)}
+                      className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer accent-primary" 
+                    />
+                    <span>Hiện các mốc chú ý</span>
+                  </label>
                 </div>
               </div>
             )}

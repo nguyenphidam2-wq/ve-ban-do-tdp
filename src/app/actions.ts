@@ -83,3 +83,27 @@ export async function deletePoi(id: string) {
     return { success: false, error: error.message };
   }
 }
+
+export async function updateZoneProperties(id: string, properties: any) {
+  try {
+    await dbConnect();
+    await Zone.findByIdAndUpdate(id, { $set: { properties } });
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating zone properties:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updatePoiProperties(id: string, properties: any) {
+  try {
+    await dbConnect();
+    await POI.findByIdAndUpdate(id, { $set: { properties } });
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating POI properties:', error);
+    return { success: false, error: error.message };
+  }
+}

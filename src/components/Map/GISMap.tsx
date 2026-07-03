@@ -7,7 +7,7 @@ import '@geoman-io/leaflet-geoman-free';
 import * as turf from '@turf/turf';
 import ZoneModal from './ZoneModal';
 import PoiModal from './PoiModal';
-import { saveZone, getZones, savePoi, getPois, deleteZone, deletePoi } from '@/app/actions';
+import { saveZone, getZones, savePoi, getPois, deleteZone, deletePoi, updateZoneProperties, updatePoiProperties } from '@/app/actions';
 
 // Fix default Leaflet marker icon asset resolution paths in Next.js
 if (typeof window !== 'undefined') {
@@ -175,6 +175,14 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   const [poiModalOpen, setPoiModalOpen] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   
+  // Edit states for Zone and POI
+  const [isEdit, setIsEdit] = useState(false);
+  const [isPoiEdit, setIsPoiEdit] = useState(false);
+
+  // Layer visibility toggles
+  const [showZones, setShowZones] = useState(true);
+  const [showPois, setShowPois] = useState(true);
+  
   const [currentLayer, setCurrentLayer] = useState<any>(null);
   const [currentPoiLayer, setCurrentPoiLayer] = useState<any>(null);
   
@@ -209,12 +217,33 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     fetchPois();
   }, [fetchZones, fetchPois]);
 
+  const handleStartEditPoi = (poi: any) => {
+    setIsPoiEdit(true);
+    setPoiInitialData({
+      _id: poi._id,
+      ...poi.properties
+    });
+    setPoiModalOpen(true);
+  };
+
   useEffect(() => {
     refreshAllData();
 
     const handleLayerChange = (e: any) => {
       if (e.detail && e.detail.layer) {
         setMapLayer(e.detail.layer);
+      }
+    };
+
+    const handleToggleZones = (e: any) => {
+      if (e.detail) {
+        setShowZones(e.detail.visible);
+      }
+    };
+
+    const handleTogglePois = (e: any) => {
+      if (e.detail) {
+        setShowPois(e.detail.visible);
       }
     };
 
@@ -231,15 +260,33 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       }
     };
 
+    // Attach global edit handler for raw HTML popups
+    (window as any).editZoneFromMap = (id: string) => {
+      const zoneToEdit = zones.find(z => z._id === id);
+      if (zoneToEdit) {
+        setIsEdit(true);
+        setInitialData({
+          _id: zoneToEdit._id,
+          ...zoneToEdit.properties
+        });
+        setModalOpen(true);
+      }
+    };
+
     window.addEventListener('zone-saved', refreshAllData);
     window.addEventListener('map-change-layer', handleLayerChange);
+    window.addEventListener('map-toggle-zones', handleToggleZones);
+    window.addEventListener('map-toggle-pois', handleTogglePois);
 
     return () => {
       delete (window as any).deleteZoneFromMap;
+      delete (window as any).editZoneFromMap;
       window.removeEventListener('zone-saved', refreshAllData);
       window.removeEventListener('map-change-layer', handleLayerChange);
+      window.removeEventListener('map-toggle-zones', handleToggleZones);
+      window.removeEventListener('map-toggle-pois', handleTogglePois);
     };
-  }, [refreshAllData]);
+  }, [refreshAllData, zones]);
 
   const handleZoneCreated = useCallback((layer: any) => {
     const geoJson = layer.toGeoJSON();
@@ -266,7 +313,15 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   }, []);
 
   const handleSaveData = async (data: any) => {
-    if (currentLayer) {
+    if (isEdit && data._id) {
+      const res = await updateZoneProperties(data._id, data);
+      if (res.success) {
+        refreshAllData();
+        window.dispatchEvent(new CustomEvent('zone-saved'));
+      } else {
+        alert('Lỗi khi cập nhật ranh giới: ' + res.error);
+      }
+    } else if (currentLayer) {
       const geoJson = currentLayer.toGeoJSON();
       const res = await saveZone({
         geometry: geoJson.geometry,
@@ -283,10 +338,19 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     }
     setModalOpen(false);
     setCurrentLayer(null);
+    setIsEdit(false);
   };
 
   const handleSavePoi = async (data: any) => {
-    if (currentPoiLayer) {
+    if (isPoiEdit && data._id) {
+      const res = await updatePoiProperties(data._id, data);
+      if (res.success) {
+        refreshAllData();
+        window.dispatchEvent(new CustomEvent('zone-saved'));
+      } else {
+        alert('Lỗi khi cập nhật điểm chú ý: ' + res.error);
+      }
+    } else if (currentPoiLayer) {
       const latlng = currentPoiLayer.getLatLng();
       const res = await savePoi({
         geometry: {
@@ -306,18 +370,21 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     }
     setPoiModalOpen(false);
     setCurrentPoiLayer(null);
+    setIsPoiEdit(false);
   };
 
   const handleCloseModal = () => {
     if (currentLayer) currentLayer.remove();
     setModalOpen(false);
     setCurrentLayer(null);
+    setIsEdit(false);
   };
 
   const handleClosePoiModal = () => {
     if (currentPoiLayer) currentPoiLayer.remove();
     setPoiModalOpen(false);
     setCurrentPoiLayer(null);
+    setIsPoiEdit(false);
   };
 
   return (
@@ -337,7 +404,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           maxZoom={21}
         />
 
-        {zones.map((zone, idx) => (
+        {showZones && zones.map((zone, idx) => (
           <GeoJSON
             key={zone._id || idx}
             data={zone}
@@ -366,9 +433,12 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                       "${props.notes}"
                     </div>
                   ` : ''}
-                  <div class="mt-3 pt-2 border-t border-white/10">
-                    <button onclick="window.deleteZoneFromMap('${(feature as any)._id}')" class="w-full py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
-                      🗑️ Xóa ranh giới này
+                  <div class="mt-3 pt-2 border-t border-white/10 flex gap-2">
+                    <button onclick="window.editZoneFromMap('${(feature as any)._id}')" class="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
+                      ✏️ Sửa
+                    </button>
+                    <button onclick="window.deleteZoneFromMap('${(feature as any)._id}')" class="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
+                      🗑️ Xóa
                     </button>
                   </div>
                 </div>
@@ -377,7 +447,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           />
         ))}
 
-        {pois.map((poi, idx) => {
+        {showPois && pois.map((poi, idx) => {
           const coords = poi.geometry?.coordinates;
           const props = poi.properties || {};
           if (!coords || coords.length < 2) return null;
@@ -395,7 +465,13 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                   <p className="text-xs text-white/80 leading-relaxed font-medium py-1">
                     {props.notes || 'Không có ghi chú.'}
                   </p>
-                  <div className="mt-3 pt-2 border-t border-white/10">
+                  <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
+                    <button 
+                      onClick={() => handleStartEditPoi(poi)}
+                      className="flex-1 py-1.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
+                    >
+                      ✏️ Sửa
+                    </button>
                     <button 
                       onClick={async () => {
                         if (confirm('Bạn có chắc chắn muốn xóa mốc ghi chú này không?')) {
@@ -408,9 +484,9 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                           }
                         }
                       }}
-                      className="w-full py-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
+                      className="py-1.5 px-2 bg-red-600/80 hover:bg-red-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
                     >
-                      🗑️ Xóa điểm mốc này
+                      🗑️ Xóa
                     </button>
                   </div>
                   <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-white/30 uppercase tracking-widest text-right">
@@ -446,6 +522,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         onClose={handleCloseModal}
         onSave={handleSaveData}
         initialData={initialData}
+        isEdit={isEdit}
       />
 
       <PoiModal
@@ -453,6 +530,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         onClose={handleClosePoiModal}
         onSave={handleSavePoi}
         initialData={poiInitialData}
+        isEdit={isPoiEdit}
       />
     </div>
   );

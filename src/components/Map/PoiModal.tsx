@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Save, AlertTriangle, Info, Camera, Flame } from 'lucide-react';
 
 interface PoiData {
+  _id?: string;
   name: string;
   notes: string;
   type: string;
@@ -14,18 +15,25 @@ interface PoiModalProps {
   onClose: () => void;
   onSave: (data: PoiData) => void;
   initialData?: Partial<PoiData>;
+  isEdit?: boolean;
 }
 
-export default function PoiModal({ isOpen, onClose, onSave, initialData }: PoiModalProps) {
+export default function PoiModal({ isOpen, onClose, onSave, initialData, isEdit }: PoiModalProps) {
   const [formData, setFormData] = useState<PoiData>({
+    _id: '',
     name: 'Điểm chú ý',
     notes: '',
     type: 'warning',
   });
 
   useEffect(() => {
-    if (initialData) {
-      setFormData(prev => ({ ...prev, ...initialData }));
+    if (isOpen) {
+      setFormData({
+        _id: initialData?._id || '',
+        name: initialData?.name || 'Điểm chú ý',
+        notes: initialData?.notes || '',
+        type: initialData?.type || 'warning',
+      });
     }
   }, [initialData, isOpen]);
 
@@ -41,8 +49,12 @@ export default function PoiModal({ isOpen, onClose, onSave, initialData }: PoiMo
               <AlertTriangle className="text-yellow-500 w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Thêm Điểm Chú Ý / Nổi Bật</h2>
-              <p className="text-xs text-white/40">Gắn nhãn thông tin cho vị trí đánh dấu</p>
+              <h2 className="text-base font-bold text-white">
+                {isEdit ? 'Cập nhật Điểm Chú Ý' : 'Thêm Điểm Chú Ý / Nổi Bật'}
+              </h2>
+              <p className="text-xs text-white/40">
+                {isEdit ? 'Cập nhật nhãn thông tin cho vị trí đánh dấu' : 'Gắn nhãn thông tin cho vị trí đánh dấu'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/50 transition-colors">
@@ -97,10 +109,10 @@ export default function PoiModal({ isOpen, onClose, onSave, initialData }: PoiMo
           </button>
           <button 
             onClick={() => onSave(formData)}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Save size={16} />
-            Lưu điểm
+            {isEdit ? 'Cập nhật điểm' : 'Lưu điểm'}
           </button>
         </div>
       </div>

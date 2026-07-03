@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Save, MapPin, Phone, Shield } from 'lucide-react';
 
 interface ZoneData {
+  _id?: string;
   id: string;
   name: string;
   officer: string;
@@ -20,10 +21,12 @@ interface ZoneModalProps {
   onClose: () => void;
   onSave: (data: ZoneData) => void;
   initialData?: Partial<ZoneData>;
+  isEdit?: boolean;
 }
 
-export default function ZoneModal({ isOpen, onClose, onSave, initialData }: ZoneModalProps) {
+export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit }: ZoneModalProps) {
   const [formData, setFormData] = useState<ZoneData>({
+    _id: '',
     id: '',
     name: '',
     officer: '',
@@ -36,8 +39,19 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData }: Zone
   });
 
   useEffect(() => {
-    if (initialData) {
-      setFormData(prev => ({ ...prev, ...initialData }));
+    if (isOpen) {
+      setFormData({
+        _id: initialData?._id || '',
+        id: initialData?.id || '',
+        name: initialData?.name || '',
+        officer: initialData?.officer || '',
+        households: initialData?.households || 0,
+        population: initialData?.population || 0,
+        area: initialData?.area || 0,
+        cskv: initialData?.cskv || '',
+        phone: initialData?.phone || '',
+        notes: initialData?.notes || '',
+      });
     }
   }, [initialData, isOpen]);
 
@@ -53,8 +67,12 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData }: Zone
               <MapPin className="text-primary w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Nhập thông tin tổ dân phố</h2>
-              <p className="text-xs text-white/40">Cập nhật thuộc tính cho tổ dân phố</p>
+              <h2 className="text-lg font-bold text-white">
+                {isEdit ? 'Cập nhật thông tin tổ dân phố' : 'Nhập thông tin tổ dân phố'}
+              </h2>
+              <p className="text-xs text-white/40">
+                {isEdit ? 'Cập nhật thuộc tính của tổ dân phố đã chọn' : 'Cập nhật thuộc tính cho tổ dân phố'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/50 transition-colors">
@@ -162,10 +180,10 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData }: Zone
           </button>
           <button 
             onClick={() => onSave(formData)}
-            className="flex-1 px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center gap-2"
+            className="flex-1 px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Save size={18} />
-            Lưu dữ liệu
+            {isEdit ? 'Cập nhật dữ liệu' : 'Lưu dữ liệu'}
           </button>
         </div>
       </div>
