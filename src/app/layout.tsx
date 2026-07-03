@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
 export const metadata: Metadata = {
-  title: "GIS Digitizer Pro | Hệ thống số hóa bản đồ",
-  description: "Hệ thống số hóa bản đồ GIS chuyên nghiệp với Next.js và Leaflet",
+  title: "Vẽ bản đồ số Liên Chiểu | Hệ thống số hóa bản đồ",
+  description: "Hệ thống số hóa bản đồ chuyên nghiệp địa bàn quận Liên Chiểu",
 };
 
 export default function RootLayout({

@@ -108,7 +108,7 @@ export default function Sidebar() {
 
   const navItems = [
     { id: 'map', icon: MapIcon, label: 'Bản đồ số' },
-    { id: 'data', icon: Database, label: 'Dữ liệu GIS' },
+    { id: 'data', icon: Database, label: 'Danh sách tổ dân phố' },
   ];
 
   return (
@@ -149,7 +149,7 @@ export default function Sidebar() {
               <Layers className="text-white w-6 h-6" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-none text-white">GIS Pro</h1>
+              <h1 className="font-bold text-base leading-none text-white">Vẽ bản đồ số Liên Chiểu</h1>
               <p className="text-xs text-white/50 mt-1">Hệ thống số hóa v1.0</p>
             </div>
           </div>
@@ -277,7 +277,7 @@ export default function Sidebar() {
             {/* Help Section */}
             {!isCollapsed && (
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-                <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Hướng dẫn số hóa</h3>
+                <h3 className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Hướng dẫn vẽ</h3>
                 <ul className="text-[11px] text-white/60 space-y-2 list-disc ml-3">
                   <li>Click nút định vị ở góc dưới bên phải hoặc nút vẽ đa giác để bắt đầu.</li>
                   <li>Click các điểm trên bản đồ để xác định đỉnh ranh giới.</li>
@@ -290,7 +290,7 @@ export default function Sidebar() {
 
         {currentTab === 'data' && (
           <div className="p-6 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-widest">Dữ liệu GIS</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-widest">Danh sách tổ dân phố</h3>
             <p className="text-xs text-white/50">Quản lý và xuất nhập dữ liệu ranh giới địa bàn quận Liên Chiểu.</p>
             
             {/* List of TDPs */}
