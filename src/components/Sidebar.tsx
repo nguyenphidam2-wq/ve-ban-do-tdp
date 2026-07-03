@@ -228,13 +228,7 @@ export default function Sidebar() {
                     onClick={() => window.dispatchEvent(new CustomEvent('start-drawing-polygon'))}
                     className="w-full flex items-center justify-center gap-2 p-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] cursor-pointer"
                   >
-                    ✏️ Vẽ ranh giới tự do (Thẳng)
-                  </button>
-                  <button
-                    onClick={() => window.dispatchEvent(new CustomEvent('start-routing-draw'))}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02] cursor-pointer"
-                  >
-                    🛣️ Vẽ ranh giới bám đường đi
+                    ✏️ Vẽ ranh giới Tổ dân phố
                   </button>
                   <button
                     onClick={() => window.dispatchEvent(new CustomEvent('start-drawing-marker'))}
