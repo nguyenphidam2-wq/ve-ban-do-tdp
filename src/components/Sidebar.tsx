@@ -393,7 +393,7 @@ export default function Sidebar() {
       {/* Footer info */}
       {!isCollapsed && (
         <div className="p-6 border-t border-white/10 text-[10px] text-white/30 uppercase tracking-widest text-center shrink-0">
-          Powered by Next.js & Leaflet
+          Design by NPĐ
         </div>
       )}
     </aside>
