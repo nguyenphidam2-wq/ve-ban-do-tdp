@@ -453,28 +453,38 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                   )}
                   <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
                     <button 
-                      onClick={() => {
-                        setIsEdit(true);
-                        setInitialData({
-                          _id: zone._id,
-                          ...zone.properties
-                        });
-                        setModalOpen(true);
+                      ref={(el) => {
+                        if (el) {
+                          el.onclick = (e) => {
+                            e.stopPropagation();
+                            setIsEdit(true);
+                            setInitialData({
+                              _id: zone._id,
+                              ...zone.properties
+                            });
+                            setModalOpen(true);
+                          };
+                        }
                       }}
                       className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
                     >
                       ✏️ Sửa
                     </button>
                     <button 
-                      onClick={async () => {
-                        if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
-                          const res = await deleteZone(zone._id);
-                          if (res.success) {
-                            refreshAllData();
-                            window.dispatchEvent(new CustomEvent('zone-saved'));
-                          } else {
-                            alert('Lỗi khi xóa: ' + res.error);
-                          }
+                      ref={(el) => {
+                        if (el) {
+                          el.onclick = async (e) => {
+                            e.stopPropagation();
+                            if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
+                              const res = await deleteZone(zone._id);
+                              if (res.success) {
+                                refreshAllData();
+                                window.dispatchEvent(new CustomEvent('zone-saved'));
+                              } else {
+                                alert('Lỗi khi xóa: ' + res.error);
+                              }
+                            }
+                          };
                         }
                       }}
                       className="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
@@ -508,21 +518,33 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                   </p>
                   <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
                     <button 
-                      onClick={() => handleStartEditPoi(poi)}
+                      ref={(el) => {
+                        if (el) {
+                          el.onclick = (e) => {
+                            e.stopPropagation();
+                            handleStartEditPoi(poi);
+                          };
+                        }
+                      }}
                       className="flex-1 py-1.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
                     >
                       ✏️ Sửa
                     </button>
                     <button 
-                      onClick={async () => {
-                        if (confirm('Bạn có chắc chắn muốn xóa mốc ghi chú này không?')) {
-                          const res = await deletePoi(poi._id);
-                          if (res.success) {
-                            refreshAllData();
-                            window.dispatchEvent(new CustomEvent('zone-saved'));
-                          } else {
-                            alert('Lỗi khi xóa: ' + res.error);
-                          }
+                      ref={(el) => {
+                        if (el) {
+                          el.onclick = async (e) => {
+                            e.stopPropagation();
+                            if (confirm('Bạn có chắc chắn muốn xóa mốc ghi chú này không?')) {
+                              const res = await deletePoi(poi._id);
+                              if (res.success) {
+                                refreshAllData();
+                                window.dispatchEvent(new CustomEvent('zone-saved'));
+                              } else {
+                                alert('Lỗi khi xóa: ' + res.error);
+                              }
+                            }
+                          };
                         }
                       }}
                       className="py-1.5 px-2 bg-red-600/80 hover:bg-red-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
