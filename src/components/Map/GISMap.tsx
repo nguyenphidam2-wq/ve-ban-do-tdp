@@ -66,7 +66,7 @@ const MapController = ({
 
     // Enable Geoman with full suite of tools
     map.pm.addControls({
-      position: 'topleft',
+      position: 'topright',
       drawMarker: true,
       drawCircleMarker: false,
       drawPolyline: false,
@@ -111,7 +111,10 @@ const MapController = ({
 
     map.on('pm:create', handleCreate);
 
-    const handleDrawStart = () => onDrawingStateChange(true);
+    const handleDrawStart = () => {
+      onDrawingStateChange(true);
+      window.dispatchEvent(new CustomEvent('map-drawing-started'));
+    };
     const handleDrawEnd = () => onDrawingStateChange(false);
 
     map.on('pm:drawstart', handleDrawStart);

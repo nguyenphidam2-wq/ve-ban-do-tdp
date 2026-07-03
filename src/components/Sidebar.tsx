@@ -56,11 +56,20 @@ export default function Sidebar() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Collapse sidebar by default on mobile devices
+  // Collapse sidebar by default on mobile devices and collapse on drawing start
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsCollapsed(true);
     }
+
+    const handleDrawingStarted = () => {
+      setIsCollapsed(true);
+    };
+    window.addEventListener('map-drawing-started', handleDrawingStarted);
+
+    return () => {
+      window.removeEventListener('map-drawing-started', handleDrawingStarted);
+    };
   }, []);
   
   const currentTab = searchParams.get('tab') || 'map';
