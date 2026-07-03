@@ -414,55 +414,58 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
               fillOpacity: 0.3,
               weight: 2
             }}
-            onEachFeature={(feature, layer) => {
-              const props = feature.properties || {};
-              layer.bindPopup(`
-                <div class="p-3 min-w-[220px] bg-slate-900 text-white rounded-lg">
-                  <h3 class="text-primary font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2">
-                    📍 ${props.name || 'Tổ dân phố'}
-                  </h3>
-                  <div class="space-y-1 text-xs">
-                    <p><span class="text-white/50">Diện tích:</span> <b>${props.area || 0} ha</b></p>
-                    <p><span class="text-white/50">Cán bộ vẽ:</span> ${props.officer || 'Chưa rõ'}</p>
-                    <p><span class="text-white/50">Dân số:</span> ${props.population || 0} người / ${props.households || 0} hộ</p>
-                    <p><span class="text-white/50">CSKV:</span> ${props.cskv || 'Chưa rõ'}</p>
-                    <p><span class="text-white/50">SĐT CSKV:</span> ${props.phone || 'Chưa rõ'}</p>
-                  </div>
-                  ${props.notes ? `
-                    <div class="mt-3 pt-2 border-t border-white/10 italic text-white/70 text-[11px] mb-2">
-                      "${props.notes}"
-                    </div>
-                  ` : ''}
-                  <div class="mt-3 pt-2 border-t border-white/10 flex gap-2">
-                    <button class="btn-edit-zone flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
-                      ✏️ Sửa
-                    </button>
-                    <button class="btn-delete-zone py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
-                      🗑️ Xóa
-                    </button>
-                  </div>
+          >
+            <Popup className="custom-leaflet-popup">
+              <div className="p-3 min-w-[220px] bg-slate-900 text-white rounded-lg">
+                <h3 className="text-primary font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2">
+                  📍 {zone.properties?.name || 'Tổ dân phố'}
+                </h3>
+                <div className="space-y-1 text-xs">
+                  <p><span className="text-white/50">Diện tích:</span> <b>{zone.properties?.area || 0} ha</b></p>
+                  <p><span className="text-white/50">Cán bộ vẽ:</span> {zone.properties?.officer || 'Chưa rõ'}</p>
+                  <p><span className="text-white/50">Dân số:</span> {zone.properties?.population || 0} người / {zone.properties?.households || 0} hộ</p>
+                  <p><span className="text-white/50">CSKV:</span> {zone.properties?.cskv || 'Chưa rõ'}</p>
+                  <p><span className="text-white/50">SĐT CSKV:</span> {zone.properties?.phone || 'Chưa rõ'}</p>
                 </div>
-              `, { className: 'custom-leaflet-popup' });
-
-              layer.on('popupopen', (e) => {
-                const popupNode = e.popup.getElement();
-                if (popupNode) {
-                  const editBtn = popupNode.querySelector('.btn-edit-zone');
-                  const deleteBtn = popupNode.querySelector('.btn-delete-zone');
-                  if (editBtn) {
-                    editBtn.addEventListener('click', () => {
-                      (window as any).editZoneFromMap(zone._id);
-                    });
-                  }
-                  if (deleteBtn) {
-                    deleteBtn.addEventListener('click', () => {
-                      (window as any).deleteZoneFromMap(zone._id);
-                    });
-                  }
-                }
-              });
-            }}
-          />
+                {zone.properties?.notes && (
+                  <div className="mt-3 pt-2 border-t border-white/10 italic text-white/70 text-[11px] mb-2">
+                    "{zone.properties.notes}"
+                  </div>
+                )}
+                <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setIsEdit(true);
+                      setInitialData({
+                        _id: zone._id,
+                        ...zone.properties
+                      });
+                      setModalOpen(true);
+                    }}
+                    className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    ✏️ Sửa
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
+                        const res = await deleteZone(zone._id);
+                        if (res.success) {
+                          refreshAllData();
+                          window.dispatchEvent(new CustomEvent('zone-saved'));
+                        } else {
+                          alert('Lỗi khi xóa: ' + res.error);
+                        }
+                      }
+                    }}
+                    className="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    🗑️ Xóa
+                  </button>
+                </div>
+              </div>
+            </Popup>
+          </GeoJSON>
         ))}
 
         {showPois && pois.map((poi, idx) => {
