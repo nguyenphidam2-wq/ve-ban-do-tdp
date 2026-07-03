@@ -40,7 +40,7 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [zones, setZones] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeLayer, setActiveLayer] = useState('hybrid');
+  const [activeLayer, setActiveLayer] = useState('streets');
   const router = useRouter();
   const searchParams = useSearchParams();
 

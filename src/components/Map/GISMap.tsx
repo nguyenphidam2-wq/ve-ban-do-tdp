@@ -183,7 +183,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   
   const [zones, setZones] = useState<any[]>([]);
   const [pois, setPois] = useState<any[]>([]);
-  const [mapLayer, setMapLayer] = useState<'hybrid' | 'streets'>('hybrid');
+  const [mapLayer, setMapLayer] = useState<'hybrid' | 'streets'>('streets');
 
   const LAYER_URLS = {
     hybrid: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
