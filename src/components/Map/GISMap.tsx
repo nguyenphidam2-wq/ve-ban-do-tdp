@@ -434,15 +434,33 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                     </div>
                   ` : ''}
                   <div class="mt-3 pt-2 border-t border-white/10 flex gap-2">
-                    <button onclick="window.editZoneFromMap('${zone._id}')" class="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
+                    <button class="btn-edit-zone flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
                       ✏️ Sửa
                     </button>
-                    <button onclick="window.deleteZoneFromMap('${zone._id}')" class="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
+                    <button class="btn-delete-zone py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer">
                       🗑️ Xóa
                     </button>
                   </div>
                 </div>
               `, { className: 'custom-leaflet-popup' });
+
+              layer.on('popupopen', (e) => {
+                const popupNode = e.popup.getElement();
+                if (popupNode) {
+                  const editBtn = popupNode.querySelector('.btn-edit-zone');
+                  const deleteBtn = popupNode.querySelector('.btn-delete-zone');
+                  if (editBtn) {
+                    editBtn.addEventListener('click', () => {
+                      (window as any).editZoneFromMap(zone._id);
+                    });
+                  }
+                  if (deleteBtn) {
+                    deleteBtn.addEventListener('click', () => {
+                      (window as any).deleteZoneFromMap(zone._id);
+                    });
+                  }
+                }
+              });
             }}
           />
         ))}
