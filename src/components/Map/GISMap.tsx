@@ -1,7 +1,6 @@
 'use client';
-
 import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, useMap, GeoJSON, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, GeoJSON, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import '@geoman-io/leaflet-geoman-free';
 // @ts-ignore
@@ -43,6 +42,14 @@ const getPoiIcon = (type: string) => {
     iconSize: [32, 32],
     iconAnchor: [16, 16]
   });
+};
+
+// Sub-component to capture map click events in react-leaflet
+const MapEvents = ({ onClick }: { onClick: (e: L.LeafletMouseEvent) => void }) => {
+  useMapEvents({
+    click: onClick,
+  });
+  return null;
 };
 
 // Custom component to initialize Geoman and handle events
@@ -176,6 +183,11 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   const [poiModalOpen, setPoiModalOpen] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   
+  // States for custom snapping to road routing
+  const [isRoutingDraw, setIsRoutingDraw] = useState(false);
+  const [routingCoords, setRoutingCoords] = useState<[number, number][]>([]);
+  const [tempRoutingPolygon, setTempRoutingPolygon] = useState<[number, number][] | null>(null);
+
   const [currentLayer, setCurrentLayer] = useState<any>(null);
   const [currentPoiLayer, setCurrentPoiLayer] = useState<any>(null);
   
@@ -210,6 +222,78 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     fetchPois();
   }, [fetchZones, fetchPois]);
 
+  // Click handler for routing drawing mode (OSRM query)
+  const handleRoutingMapClick = async (e: L.LeafletMouseEvent) => {
+    const { lat, lng } = e.latlng;
+    if (routingCoords.length === 0) {
+      setRoutingCoords([[lat, lng]]);
+    } else {
+      const prev = routingCoords[routingCoords.length - 1];
+      try {
+        // Query OSRM driving profile for route tracing
+        const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${prev[1]},${prev[0]};${lng},${lat}?geometries=geojson&overview=full`);
+        const data = await res.json();
+        
+        if (data.routes && data.routes[0]) {
+          const routeCoords = data.routes[0].geometry.coordinates.map(([lon, l]: any) => [l, lon]);
+          setRoutingCoords(prevList => [...prevList, ...routeCoords]);
+        } else {
+          // Fallback to straight line
+          setRoutingCoords(prevList => [...prevList, [lat, lng]]);
+        }
+      } catch (err) {
+        // Fallback to straight line
+        setRoutingCoords(prevList => [...prevList, [lat, lng]]);
+      }
+    }
+  };
+
+  // Close polygon by routing back to the first clicked point
+  const handleFinishRoutingDraw = async () => {
+    if (routingCoords.length < 3) return;
+    const first = routingCoords[0];
+    const last = routingCoords[routingCoords.length - 1];
+    let finalCoords = [...routingCoords];
+
+    try {
+      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${last[1]},${last[0]};${first[1]},${first[0]}?geometries=geojson&overview=full`);
+      const data = await res.json();
+      if (data.routes && data.routes[0]) {
+        const routeCoords = data.routes[0].geometry.coordinates.map(([lon, l]: any) => [l, lon]);
+        finalCoords = [...finalCoords, ...routeCoords];
+      } else {
+        finalCoords.push(first);
+      }
+    } catch (err) {
+      finalCoords.push(first);
+    }
+
+    try {
+      // Calculate area of the road-traced polygon
+      const polyGeoJson = turf.polygon([finalCoords.map(([lat, lng]) => [lng, lat])]);
+      const area = turf.area(polyGeoJson);
+      const areaHectares = (area / 10000).toFixed(4);
+
+      setTempRoutingPolygon(finalCoords);
+      setInitialData({
+        area: parseFloat(areaHectares),
+        name: `Tổ dân phố bám đường ${Math.floor(Math.random() * 1000)}`,
+        id: `ZONE_${Date.now().toString().slice(-4)}`
+      });
+      setModalOpen(true);
+    } catch (e) {
+      alert('Không thể khép kín đa giác. Hãy chắc chắn ranh giới không tự giao nhau.');
+    }
+    
+    setIsRoutingDraw(false);
+  };
+
+  const handleCancelRoutingDraw = () => {
+    setRoutingCoords([]);
+    setTempRoutingPolygon(null);
+    setIsRoutingDraw(false);
+  };
+
   useEffect(() => {
     refreshAllData();
 
@@ -217,6 +301,12 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       if (e.detail && e.detail.layer) {
         setMapLayer(e.detail.layer);
       }
+    };
+
+    const handleStartRoutingDraw = () => {
+      setIsRoutingDraw(true);
+      setRoutingCoords([]);
+      setTempRoutingPolygon(null);
     };
 
     // Attach global delete handler for raw HTML popups
@@ -234,11 +324,13 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
 
     window.addEventListener('zone-saved', refreshAllData);
     window.addEventListener('map-change-layer', handleLayerChange);
+    window.addEventListener('start-routing-draw', handleStartRoutingDraw);
 
     return () => {
       delete (window as any).deleteZoneFromMap;
       window.removeEventListener('zone-saved', refreshAllData);
       window.removeEventListener('map-change-layer', handleLayerChange);
+      window.removeEventListener('start-routing-draw', handleStartRoutingDraw);
     };
   }, [refreshAllData]);
 
@@ -267,23 +359,35 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   }, []);
 
   const handleSaveData = async (data: any) => {
-    if (currentLayer) {
-      const geoJson = currentLayer.toGeoJSON();
+    let geometry = null;
+    if (tempRoutingPolygon) {
+      geometry = {
+        type: 'Polygon',
+        coordinates: [tempRoutingPolygon.map(([lat, lng]) => [lng, lat])]
+      };
+    } else if (currentLayer) {
+      geometry = currentLayer.toGeoJSON().geometry;
+    }
+
+    if (geometry) {
       const res = await saveZone({
-        geometry: geoJson.geometry,
+        geometry,
         properties: data
       });
 
       if (res.success) {
         refreshAllData();
+        // Notify other components (like Sidebar) to refresh
         window.dispatchEvent(new CustomEvent('zone-saved'));
-        currentLayer.remove();
+        if (currentLayer) currentLayer.remove();
       } else {
         alert('Lỗi khi lưu ranh giới vào CSDL: ' + res.error);
       }
     }
     setModalOpen(false);
     setCurrentLayer(null);
+    setTempRoutingPolygon(null);
+    setRoutingCoords([]);
   };
 
   const handleSavePoi = async (data: any) => {
@@ -313,6 +417,8 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     if (currentLayer) currentLayer.remove();
     setModalOpen(false);
     setCurrentLayer(null);
+    setTempRoutingPolygon(null);
+    setRoutingCoords([]);
   };
 
   const handleClosePoiModal = () => {
@@ -337,6 +443,31 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           subdomains={['mt0', 'mt1', 'mt2', 'mt3']}
           maxZoom={21}
         />
+
+        {/* Capture custom click events for OSRM drawing */}
+        {isRoutingDraw && <MapEvents onClick={handleRoutingMapClick} />}
+
+        {/* Render temporary tracing lines and markers while digitizing */}
+        {isRoutingDraw && routingCoords.length > 0 && (
+          <>
+            <Polyline positions={routingCoords} color="#fbbf24" weight={3} dashArray="5, 10" />
+            <Marker position={routingCoords[0]}>
+              <Popup>Điểm xuất phát ranh giới</Popup>
+            </Marker>
+            {routingCoords.map((coord, i) => (
+              <Marker 
+                key={i} 
+                position={coord} 
+                icon={L.divIcon({
+                  html: `<div class="w-2.5 h-2.5 bg-yellow-400 rounded-full border border-slate-900"></div>`,
+                  className: 'routing-vertex',
+                  iconSize: [10, 10],
+                  iconAnchor: [5, 5]
+                })}
+              />
+            ))}
+          </>
+        )}
 
         {zones.map((zone, idx) => (
           <GeoJSON
@@ -430,15 +561,38 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         />
       </MapContainer>
 
+      {/* Floating deactivation buttons for normal drawing */}
       {isDrawing && (
         <button
           onClick={() => {
             window.dispatchEvent(new CustomEvent('map-disable-draw'));
           }}
-          className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-full shadow-2xl flex items-center gap-2 border border-red-500/20 transition-all hover:scale-105 cursor-pointer"
+          className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-full shadow-2xl flex items-center gap-2 border border-red-500/20 transition-all hover:scale-105 cursor-pointer animate-pulse"
         >
           <span>❌</span> Hủy vẽ ranh giới
         </button>
+      )}
+
+      {/* Floating control bar for OSRM snapping routing drawing */}
+      {isRoutingDraw && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[1000] flex gap-3 p-2 bg-slate-900/90 border border-white/10 rounded-full shadow-2xl backdrop-blur-md">
+          <div className="flex items-center text-xs font-bold text-white px-3 border-r border-white/10">
+            🛣️ Chế độ vẽ bám đường
+          </div>
+          <button
+            onClick={handleFinishRoutingDraw}
+            disabled={routingCoords.length < 3}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs rounded-full shadow transition-all cursor-pointer"
+          >
+            💾 Khép kín & Lưu
+          </button>
+          <button
+            onClick={handleCancelRoutingDraw}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-full shadow transition-all cursor-pointer"
+          >
+            ❌ Hủy vẽ
+          </button>
+        </div>
       )}
 
       <ZoneModal 
