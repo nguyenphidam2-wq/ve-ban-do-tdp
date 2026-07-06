@@ -1,4 +1,10 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+// ponytail: Force Google DNS on server-side to resolve MongoDB SRV records
+if (typeof window === 'undefined') {
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+}
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/gis_database';
 

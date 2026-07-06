@@ -307,6 +307,16 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     };
   }, [refreshAllData, zones]);
 
+  // ponytail: periodic polling to fetch latest updates every 30 seconds for concurrent drawers
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isDrawing && !modalOpen && !poiModalOpen) {
+        refreshAllData();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [refreshAllData, isDrawing, modalOpen, poiModalOpen]);
+
   const handleZoneCreated = useCallback((layer: any) => {
     const geoJson = layer.toGeoJSON();
     const area = turf.area(geoJson);
@@ -321,14 +331,46 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     setModalOpen(true);
   }, []);
 
-  const handlePoiCreated = useCallback((layer: any) => {
+  const handlePoiCreated = useCallback(async (layer: any) => {
     setCurrentPoiLayer(layer);
+    const latlng = layer.getLatLng();
+    const lat = latlng.lat;
+    const lng = latlng.lng;
+
     setPoiInitialData({
       name: 'Điểm chú ý mới',
       notes: '',
       type: 'warning'
     });
     setPoiModalOpen(true);
+
+    // ponytail: query OSM Overpass API for nearby tags to suggest metadata automatically
+    try {
+      const query = `[out:json][timeout:5];(node(around:50,${lat},${lng})[amenity];node(around:50,${lat},${lng})[shop];node(around:50,${lat},${lng})[tourism];);out body;`;
+      const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.elements && data.elements.length > 0) {
+          const element = data.elements[0];
+          const osmName = element.tags.name || element.tags.brand || '';
+          const amenity = element.tags.amenity || element.tags.shop || element.tags.tourism || '';
+          
+          if (osmName) {
+            let suggestedType = 'info';
+            if (amenity === 'camera') suggestedType = 'camera';
+            else if (amenity === 'fire_station' || amenity === 'fire_hydrant') suggestedType = 'fire';
+
+            setPoiInitialData({
+              name: osmName,
+              notes: `Gợi ý tự động từ OpenStreetMap (${amenity}).`,
+              type: suggestedType
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch OSM suggestions:', error);
+    }
   }, []);
 
   const handleSaveData = async (data: any) => {
@@ -564,6 +606,8 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           );
         })}
         
+
+
         <MapController 
           onZoneCreated={handleZoneCreated} 
           onPoiCreated={handlePoiCreated} 

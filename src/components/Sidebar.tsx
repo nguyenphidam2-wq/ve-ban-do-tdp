@@ -10,11 +10,13 @@ import {
   Database,
   Search,
   Download,
+  Upload,
   Trash2
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { getZones, deleteZone } from '@/app/actions';
+import { getZones, deleteZone, importFeatures } from '@/app/actions';
+import { parseKMLToGeoJSON } from '@/utils/kmlParser';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -52,6 +54,48 @@ export default function Sidebar() {
   const handleTogglePois = (visible: boolean) => {
     setShowPois(visible);
     window.dispatchEvent(new CustomEvent('map-toggle-pois', { detail: { visible } }));
+  };
+
+  // handleImportFile reads and uploads GeoJSON or KML files for bulk database ingestion
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        let features: any[] = [];
+
+        if (file.name.toLowerCase().endsWith('.kml')) {
+          features = parseKMLToGeoJSON(text);
+          if (features.length === 0) {
+            alert('Không tìm thấy đối tượng địa lý (Polygon, Point, LineString) nào trong tệp KML!');
+            return;
+          }
+        } else {
+          const geojson = JSON.parse(text);
+          if (!geojson || (geojson.type !== 'FeatureCollection' && geojson.type !== 'Feature')) {
+            alert('Định dạng GeoJSON không hợp lệ! File phải chứa FeatureCollection hoặc Feature.');
+            return;
+          }
+          features = geojson.type === 'FeatureCollection' ? geojson.features : [geojson];
+        }
+        
+        const res = await importFeatures(features);
+        if (res.success) {
+          alert(`Đã nhập thành công ${res.count} đối tượng từ tệp! (Zones: ${res.zones}, POIs: ${res.pois})`);
+          fetchZones();
+          window.dispatchEvent(new CustomEvent('zone-saved'));
+        } else {
+          alert(`Lỗi khi nhập dữ liệu: ${res.error}`);
+        }
+      } catch (err: any) {
+        alert(`Lỗi đọc hoặc phân tích tệp: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -359,7 +403,21 @@ export default function Sidebar() {
             )}
 
             {!isCollapsed && (
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 pt-2 flex flex-col gap-2">
+                <input 
+                  type="file" 
+                  accept=".geojson,.json,.kml" 
+                  onChange={handleImportFile} 
+                  className="hidden" 
+                  id="import-file" 
+                />
+                <label
+                  htmlFor="import-file"
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] cursor-pointer text-center"
+                >
+                  <Upload className="w-4 h-4" /> Nhập tệp GeoJSON / KML
+                </label>
+                
                 <button 
                   onClick={() => {
                     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ type: "FeatureCollection", features: zones }));

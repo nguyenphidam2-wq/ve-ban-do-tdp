@@ -107,3 +107,57 @@ export async function updatePoiProperties(id: string, properties: any) {
     return { success: false, error: error.message };
   }
 }
+
+export async function importFeatures(features: any[]) {
+  try {
+    await dbConnect();
+    let zoneCount = 0;
+    let poiCount = 0;
+
+    for (const feature of features) {
+      if (!feature.geometry || !feature.geometry.type) continue;
+      
+      const geometryType = feature.geometry.type;
+      const properties = feature.properties || {};
+      const name = properties.name || `Nhập khẩu ${geometryType}`;
+
+      if (geometryType === 'Polygon' || geometryType === 'MultiPolygon') {
+        await Zone.create({
+          geometry: feature.geometry,
+          properties: {
+            name,
+            area: properties.area || 0,
+            officer: properties.officer || 'Imported',
+            population: properties.population || 0,
+            households: properties.households || 0,
+            status: properties.status || 'active',
+            customFields: properties.customFields || {}
+          }
+        });
+        zoneCount++;
+      } else if (geometryType === 'Point') {
+        await POI.create({
+          geometry: feature.geometry,
+          properties: {
+            name,
+            notes: properties.notes || '',
+            type: properties.type || 'warning'
+          }
+        });
+        poiCount++;
+      }
+    }
+
+    revalidatePath('/');
+    return { 
+      success: true, 
+      count: zoneCount + poiCount, 
+      zones: zoneCount, 
+      pois: poiCount
+    };
+  } catch (error: any) {
+    console.error('Error importing features:', error);
+    return { success: false, error: error.message };
+  }
+}
+

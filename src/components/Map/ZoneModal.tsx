@@ -40,11 +40,12 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
 
   useEffect(() => {
     if (isOpen) {
+      const cachedOfficer = typeof window !== 'undefined' ? localStorage.getItem('officer_name') || '' : '';
       setFormData({
         _id: initialData?._id || '',
         id: initialData?.id || '',
         name: initialData?.name || '',
-        officer: initialData?.officer || '',
+        officer: initialData?.officer || cachedOfficer,
         households: initialData?.households || 0,
         population: initialData?.population || 0,
         area: initialData?.area || 0,
@@ -179,7 +180,12 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
             Hủy bỏ
           </button>
           <button 
-            onClick={() => onSave(formData)}
+            onClick={() => {
+              if (formData.officer && typeof window !== 'undefined') {
+                localStorage.setItem('officer_name', formData.officer);
+              }
+              onSave(formData);
+            }}
             className="flex-1 px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Save size={18} />
