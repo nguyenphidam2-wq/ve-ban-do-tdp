@@ -147,3 +147,96 @@ export function parseKMLToGeoJSON(kmlText: string): any[] {
 
   return features;
 }
+
+export function mergeFeaturesByName(features: any[]): any[] {
+  const merged: any[] = [];
+  
+  // Group by name
+  const groups: { [key: string]: any[] } = {};
+  features.forEach(f => {
+    const name = f.properties?.name?.trim() || 'Không tên';
+    const key = name.toLowerCase();
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+    groups[key].push(f);
+  });
+
+  for (const key in groups) {
+    const list = groups[key];
+    if (list.length === 1) {
+      merged.push(list[0]);
+      continue;
+    }
+
+    // Separate Polygons/MultiPolygons, Points, and other geometries
+    const polygonFeatures = list.filter(f => f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon');
+    const otherFeatures = list.filter(f => f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon');
+
+    // Add other geometries directly
+    merged.push(...otherFeatures);
+
+    if (polygonFeatures.length === 0) continue;
+
+    if (polygonFeatures.length === 1) {
+      merged.push(polygonFeatures[0]);
+      continue;
+    }
+
+    // Merge polygons using turf.union
+    try {
+      let unionFeature = polygonFeatures[0];
+      
+      // Sum numeric properties
+      let totalArea = polygonFeatures[0].properties?.area || 0;
+      let totalPopulation = polygonFeatures[0].properties?.population || 0;
+      let totalHouseholds = polygonFeatures[0].properties?.households || 0;
+      let combinedNotes = polygonFeatures[0].properties?.notes || '';
+      
+      for (let i = 1; i < polygonFeatures.length; i++) {
+        const nextFeat = polygonFeatures[i];
+        
+        // Sum properties
+        totalArea += nextFeat.properties?.area || 0;
+        totalPopulation += nextFeat.properties?.population || 0;
+        totalHouseholds += nextFeat.properties?.households || 0;
+        if (nextFeat.properties?.notes) {
+          combinedNotes = combinedNotes 
+            ? `${combinedNotes}\n${nextFeat.properties.notes}`
+            : nextFeat.properties.notes;
+        }
+
+        const nextUnion = turf.union(unionFeature, nextFeat);
+        if (nextUnion) {
+          unionFeature = nextUnion;
+        }
+      }
+
+      // Re-assign combined properties to the merged polygon feature
+      unionFeature.properties = {
+        ...polygonFeatures[0].properties,
+        area: parseFloat(totalArea.toFixed(4)),
+        population: totalPopulation,
+        households: totalHouseholds,
+        notes: combinedNotes
+      };
+
+      // Recalculate area with turf just to be accurate based on the union geometry
+      try {
+        const areaSqMeters = turf.area(unionFeature);
+        unionFeature.properties.area = parseFloat((areaSqMeters / 10000).toFixed(4));
+      } catch (e) {
+        console.warn('Error recalculating area of union:', e);
+      }
+
+      merged.push(unionFeature);
+    } catch (err) {
+      console.error('Failed to merge polygons for group:', key, err);
+      // Fallback: if merging fails, push them as separate features so we don't lose data
+      merged.push(...polygonFeatures);
+    }
+  }
+
+  return merged;
+}
+

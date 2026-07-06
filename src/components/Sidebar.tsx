@@ -16,7 +16,7 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { getZones, deleteZone, importFeatures } from '@/app/actions';
-import { parseKMLToGeoJSON } from '@/utils/kmlParser';
+import { parseKMLToGeoJSON, mergeFeaturesByName } from '@/utils/kmlParser';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -45,6 +45,7 @@ export default function Sidebar() {
   const [activeLayer, setActiveLayer] = useState('streets');
   const [showZones, setShowZones] = useState(true);
   const [showPois, setShowPois] = useState(true);
+  const [mergeByName, setMergeByName] = useState(true);
 
   const handleToggleZones = (visible: boolean) => {
     setShowZones(visible);
@@ -80,6 +81,10 @@ export default function Sidebar() {
             return;
           }
           features = geojson.type === 'FeatureCollection' ? geojson.features : [geojson];
+        }
+
+        if (mergeByName) {
+          features = mergeFeaturesByName(features);
         }
         
         const res = await importFeatures(features);
@@ -413,9 +418,19 @@ export default function Sidebar() {
                 />
                 <label
                   htmlFor="import-file"
-                  className="w-full flex items-center justify-center gap-2 p-3 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] cursor-pointer text-center"
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] cursor-pointer text-center animate-in fade-in duration-200"
                 >
                   <Upload className="w-4 h-4" /> Nhập tệp GeoJSON / KML
+                </label>
+
+                <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white cursor-pointer select-none transition-colors px-1 py-1">
+                  <input 
+                    type="checkbox" 
+                    checked={mergeByName}
+                    onChange={(e) => setMergeByName(e.target.checked)}
+                    className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer accent-primary" 
+                  />
+                  <span>Tự động gộp vùng cùng tên</span>
                 </label>
                 
                 <button 
