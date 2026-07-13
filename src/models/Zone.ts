@@ -25,6 +25,7 @@ const ZoneSchema = new Schema({
     population: { type: Number, default: 0 },
     households: { type: Number, default: 0 },
     status: { type: String, default: 'active' },
+    isFrozen: { type: Boolean, default: false },
     customFields: { type: Map, of: String }, // For dynamic properties
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

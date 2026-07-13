@@ -202,3 +202,60 @@ export async function importFeatures(features: any[]) {
   }
 }
 
+export async function mergeZones(selectedIds: string[], mergedGeometry: any, newProperties: any, deleteOld: boolean = true) {
+  try {
+    await dbConnect();
+    const sanitizedGeometry = sanitizeGeoJSONGeometry(mergedGeometry) || mergedGeometry;
+
+    const newZone = await Zone.create({
+      geometry: sanitizedGeometry,
+      properties: {
+        ...newProperties,
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+
+    if (deleteOld && selectedIds && selectedIds.length > 0) {
+      await Zone.deleteMany({ _id: { $in: selectedIds } });
+    } else if (selectedIds && selectedIds.length > 0) {
+      await Zone.updateMany(
+        { _id: { $in: selectedIds } },
+        { $set: { 'properties.status': 'archived' } }
+      );
+    }
+
+    revalidatePath('/');
+    return { success: true, data: JSON.parse(JSON.stringify(newZone)) };
+  } catch (error: any) {
+    console.error('Error merging zones:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function toggleFreezeZone(id: string, isFrozen: boolean) {
+  try {
+    await dbConnect();
+    await Zone.findByIdAndUpdate(id, { $set: { 'properties.isFrozen': isFrozen } });
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error toggling freeze state:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function freezeAllZones(isFrozen: boolean) {
+  try {
+    await dbConnect();
+    await Zone.updateMany({}, { $set: { 'properties.isFrozen': isFrozen } });
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error freezing/unfreezing all zones:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+
