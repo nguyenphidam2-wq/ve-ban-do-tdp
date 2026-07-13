@@ -14,7 +14,7 @@ const ZoneSchema = new Schema({
       required: true
     },
     coordinates: {
-      type: [[[Number]]], // For Polygon
+      type: Schema.Types.Mixed, // For Polygon and MultiPolygon
       required: true
     }
   },

@@ -1,5 +1,7 @@
 // @ts-ignore
 import * as turf from '@turf/turf';
+import JSZip from 'jszip';
+import { sanitizeGeoJSONGeometry } from '@/utils/geoSanitizer';
 
 
 export function parseKMLToGeoJSON(kmlText: string): any[] {
@@ -85,13 +87,16 @@ export function parseKMLToGeoJSON(kmlText: string): any[] {
       });
 
       if (coordinatesList.length > 0) {
+        const sanitizedGeo = sanitizeGeoJSONGeometry({
+          type: 'Polygon',
+          coordinates: coordinatesList
+        });
+        if (!sanitizedGeo) return;
+
         const feature = {
           type: 'Feature' as const,
           properties: { ...properties },
-          geometry: {
-            type: 'Polygon' as const,
-            coordinates: coordinatesList
-          }
+          geometry: sanitizedGeo
         };
 
         // Calculate area in Hectares using turf
@@ -125,12 +130,39 @@ export function parseKMLToGeoJSON(kmlText: string): any[] {
       }
     });
 
-    // Parse LineStrings
+    // Parse LineStrings (convert closed loops to Polygon zones)
     const lineStrings = placemark.querySelectorAll('LineString');
     lineStrings.forEach((line) => {
       const coordEl = line.querySelector('coordinates');
       if (coordEl && coordEl.textContent) {
         const coords = parseCoordinates(coordEl.textContent);
+        if (coords.length >= 3) {
+          const first = coords[0];
+          const last = coords[coords.length - 1];
+          // If first and last point are close (< 0.02 deg ~ 2km), treat as closed polygon loop
+          const isClosedLoop = Math.abs(first[0] - last[0]) < 0.02 && Math.abs(first[1] - last[1]) < 0.02;
+
+          if (isClosedLoop) {
+            const sanitizedGeo = sanitizeGeoJSONGeometry({
+              type: 'Polygon',
+              coordinates: [coords]
+            });
+            if (sanitizedGeo) {
+              const feature = {
+                type: 'Feature' as const,
+                properties: { ...properties },
+                geometry: sanitizedGeo
+              };
+              try {
+                const areaSqMeters = turf.area(feature);
+                feature.properties.area = parseFloat((areaSqMeters / 10000).toFixed(4));
+              } catch (e) {}
+              features.push(feature);
+              return;
+            }
+          }
+        }
+
         if (coords.length > 0) {
           features.push({
             type: 'Feature' as const,
@@ -238,5 +270,23 @@ export function mergeFeaturesByName(features: any[]): any[] {
   }
 
   return merged;
+}
+
+export async function parseKMZToGeoJSON(kmzBuffer: ArrayBuffer): Promise<any[]> {
+  const zip = await JSZip.loadAsync(kmzBuffer);
+  let kmlFile: JSZip.JSZipObject | null = null;
+
+  zip.forEach((relativePath, file) => {
+    if (!file.dir && relativePath.toLowerCase().endsWith('.kml')) {
+      kmlFile = file;
+    }
+  });
+
+  if (!kmlFile) {
+    throw new Error('Không tìm thấy tệp .kml bên trong tệp KMZ.');
+  }
+
+  const kmlText = await (kmlFile as JSZip.JSZipObject).async('text');
+  return parseKMLToGeoJSON(kmlText);
 }
 

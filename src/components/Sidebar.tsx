@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { getZones, deleteZone, importFeatures } from '@/app/actions';
-import { parseKMLToGeoJSON, mergeFeaturesByName } from '@/utils/kmlParser';
+import { getZones, deleteZone, importFeatures, deleteAllFeatures } from '@/app/actions';
+import { parseKMLToGeoJSON, parseKMZToGeoJSON, mergeFeaturesByName } from '@/utils/kmlParser';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -45,6 +45,9 @@ export default function Sidebar() {
   const [activeLayer, setActiveLayer] = useState('streets');
   const [showZones, setShowZones] = useState(true);
   const [showPois, setShowPois] = useState(true);
+  const [showTdpLabels, setShowTdpLabels] = useState(true);
+  const [showCommunityHouses, setShowCommunityHouses] = useState(true);
+
   const [mergeByName, setMergeByName] = useState(true);
 
   const handleToggleZones = (visible: boolean) => {
@@ -57,50 +60,79 @@ export default function Sidebar() {
     window.dispatchEvent(new CustomEvent('map-toggle-pois', { detail: { visible } }));
   };
 
-  // handleImportFile reads and uploads GeoJSON or KML files for bulk database ingestion
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToggleTdpLabels = (visible: boolean) => {
+    setShowTdpLabels(visible);
+    window.dispatchEvent(new CustomEvent('map-toggle-tdp-labels', { detail: { visible } }));
+  };
+
+  const handleToggleCommunityHouses = (visible: boolean) => {
+    setShowCommunityHouses(visible);
+    window.dispatchEvent(new CustomEvent('map-toggle-community-houses', { detail: { visible } }));
+  };
+
+
+  // handleImportFile reads and uploads GeoJSON, KML, or KMZ files for bulk database ingestion
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string;
-        let features: any[] = [];
+    try {
+      let features: any[] = [];
+      const fileName = file.name.toLowerCase();
 
-        if (file.name.toLowerCase().endsWith('.kml')) {
-          features = parseKMLToGeoJSON(text);
-          if (features.length === 0) {
-            alert('Không tìm thấy đối tượng địa lý (Polygon, Point, LineString) nào trong tệp KML!');
-            return;
-          }
-        } else {
-          const geojson = JSON.parse(text);
-          if (!geojson || (geojson.type !== 'FeatureCollection' && geojson.type !== 'Feature')) {
-            alert('Định dạng GeoJSON không hợp lệ! File phải chứa FeatureCollection hoặc Feature.');
-            return;
-          }
-          features = geojson.type === 'FeatureCollection' ? geojson.features : [geojson];
+      if (fileName.endsWith('.kmz')) {
+        const arrayBuffer = await file.arrayBuffer();
+        features = await parseKMZToGeoJSON(arrayBuffer);
+        if (features.length === 0) {
+          alert('Không tìm thấy đối tượng địa lý (Polygon, Point, LineString) nào trong tệp KMZ!');
+          return;
         }
-
-        if (mergeByName) {
-          features = mergeFeaturesByName(features);
+      } else if (fileName.endsWith('.kml')) {
+        const text = await file.text();
+        features = parseKMLToGeoJSON(text);
+        if (features.length === 0) {
+          alert('Không tìm thấy đối tượng địa lý (Polygon, Point, LineString) nào trong tệp KML!');
+          return;
         }
-        
-        const res = await importFeatures(features);
-        if (res.success) {
-          alert(`Đã nhập thành công ${res.count} đối tượng từ tệp! (Zones: ${res.zones}, POIs: ${res.pois})`);
-          fetchZones();
-          window.dispatchEvent(new CustomEvent('zone-saved'));
-        } else {
-          alert(`Lỗi khi nhập dữ liệu: ${res.error}`);
+      } else {
+        const text = await file.text();
+        const geojson = JSON.parse(text);
+        if (!geojson || (geojson.type !== 'FeatureCollection' && geojson.type !== 'Feature')) {
+          alert('Định dạng GeoJSON không hợp lệ! File phải chứa FeatureCollection hoặc Feature.');
+          return;
         }
-      } catch (err: any) {
-        alert(`Lỗi đọc hoặc phân tích tệp: ${err.message}`);
+        features = geojson.type === 'FeatureCollection' ? geojson.features : [geojson];
       }
-    };
-    reader.readAsText(file);
+
+      if (mergeByName) {
+        features = mergeFeaturesByName(features);
+      }
+      
+      const res = await importFeatures(features);
+      if (res.success) {
+        alert(`Đã nhập thành công ${res.count} đối tượng từ tệp! (Zones: ${res.zones}, POIs: ${res.pois})`);
+        fetchZones();
+        window.dispatchEvent(new CustomEvent('zone-saved'));
+      } else {
+        alert(`Lỗi khi nhập dữ liệu: ${res.error}`);
+      }
+    } catch (err: any) {
+      alert(`Lỗi đọc hoặc phân tích tệp: ${err.message}`);
+    }
     e.target.value = '';
+  };
+
+  const handleDeleteAllData = async () => {
+    if (confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ dữ liệu (tổ dân phố & điểm chú ý) trên bản đồ để nhập lại không?')) {
+      const res = await deleteAllFeatures();
+      if (res.success) {
+        alert('Đã xóa toàn bộ dữ liệu thành công!');
+        fetchZones();
+        window.dispatchEvent(new CustomEvent('zone-saved'));
+      } else {
+        alert(`Lỗi khi xóa dữ liệu: ${res.error}`);
+      }
+    }
   };
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -296,16 +328,25 @@ export default function Sidebar() {
                       onChange={(e) => handleToggleZones(e.target.checked)}
                       className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer accent-primary" 
                     />
-                    <span>Hiện ranh giới Tổ dân phố</span>
+                    <span>Hiện ranh giới Tổ dân phố (27)</span>
                   </label>
                   <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white cursor-pointer select-none transition-colors">
                     <input 
                       type="checkbox" 
-                      checked={showPois}
-                      onChange={(e) => handleTogglePois(e.target.checked)}
+                      checked={showTdpLabels}
+                      onChange={(e) => handleToggleTdpLabels(e.target.checked)}
                       className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer accent-primary" 
                     />
-                    <span>Hiện các mốc chú ý</span>
+                    <span>🏷️ Điểm Nhãn Tổ Dân Phố (27)</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white cursor-pointer select-none transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={showCommunityHouses}
+                      onChange={(e) => handleToggleCommunityHouses(e.target.checked)}
+                      className="rounded border-white/10 bg-white/5 text-primary focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 cursor-pointer accent-primary" 
+                    />
+                    <span>🏛️ Nhà SHCĐ / Thiết Chế VH (30)</span>
                   </label>
                 </div>
               </div>
@@ -411,7 +452,7 @@ export default function Sidebar() {
               <div className="space-y-3 pt-2 flex flex-col gap-2">
                 <input 
                   type="file" 
-                  accept=".geojson,.json,.kml" 
+                  accept=".geojson,.json,.kml,.kmz" 
                   onChange={handleImportFile} 
                   className="hidden" 
                   id="import-file" 
@@ -420,7 +461,7 @@ export default function Sidebar() {
                   htmlFor="import-file"
                   className="w-full flex items-center justify-center gap-2 p-3 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] cursor-pointer text-center animate-in fade-in duration-200"
                 >
-                  <Upload className="w-4 h-4" /> Nhập tệp GeoJSON / KML
+                  <Upload className="w-4 h-4" /> Nhập tệp GeoJSON / KML / KMZ
                 </label>
 
                 <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white cursor-pointer select-none transition-colors px-1 py-1">
@@ -438,14 +479,29 @@ export default function Sidebar() {
                     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ type: "FeatureCollection", features: zones }));
                     const downloadAnchor = document.createElement('a');
                     downloadAnchor.setAttribute("href", dataStr);
-                    downloadAnchor.setAttribute("download", "TDP_LienChieu_Export.geojson");
+                    downloadAnchor.setAttribute("download", "tdp_export.geojson");
                     document.body.appendChild(downloadAnchor);
                     downloadAnchor.click();
                     downloadAnchor.remove();
                   }}
-                  className="w-full flex items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white text-xs font-medium transition-all"
+                  className="w-full flex items-center justify-center gap-2 p-2.5 bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 rounded-xl text-xs font-medium transition-all cursor-pointer text-center"
                 >
-                  <Download className="w-4 h-4" /> Xuất tệp GeoJSON
+                  <Download className="w-4 h-4" /> Xuất dữ liệu ra file GeoJSON
+                </button>
+
+                <a
+                  href="/Danh_sach_57_Diem_Chu_Y_TDP_25_6.xlsx"
+                  download="Danh_sach_57_Diem_Chu_Y_TDP_25_6.xlsx"
+                  className="w-full flex items-center justify-center gap-2 p-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
+                >
+                  <span>📊</span> Tải danh sách Excel Điểm Chú Ý (.xlsx)
+                </a>
+
+                <button
+                  onClick={handleDeleteAllData}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
+                >
+                  <Trash2 className="w-4 h-4" /> Xóa toàn bộ dữ liệu
                 </button>
               </div>
             )}

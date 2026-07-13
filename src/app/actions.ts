@@ -4,15 +4,17 @@ import dbConnect from '@/lib/db';
 import Zone from '@/models/Zone';
 import POI from '@/models/POI';
 import { revalidatePath } from 'next/cache';
+import { sanitizeGeoJSONGeometry } from '@/utils/geoSanitizer';
 
 export async function saveZone(formData: any) {
   try {
     await dbConnect();
     
     const { geometry, properties } = formData;
+    const sanitizedGeometry = sanitizeGeoJSONGeometry(geometry) || geometry;
     
     const newZone = await Zone.create({
-      geometry,
+      geometry: sanitizedGeometry,
       properties
     });
     
@@ -84,6 +86,36 @@ export async function deletePoi(id: string) {
   }
 }
 
+export async function deleteAllZones() {
+  try {
+    await dbConnect();
+    const res = await Zone.deleteMany({});
+    revalidatePath('/');
+    return { success: true, count: res.deletedCount };
+  } catch (error: any) {
+    console.error('Error deleting all zones:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteAllFeatures() {
+  try {
+    await dbConnect();
+    const zoneRes = await Zone.deleteMany({});
+    const poiRes = await POI.deleteMany({});
+    revalidatePath('/');
+    return { 
+      success: true, 
+      zoneCount: zoneRes.deletedCount,
+      poiCount: poiRes.deletedCount 
+    };
+  } catch (error: any) {
+    console.error('Error deleting all features:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+
 export async function updateZoneProperties(id: string, properties: any) {
   try {
     await dbConnect();
@@ -122,8 +154,14 @@ export async function importFeatures(features: any[]) {
       const name = properties.name || `Nhập khẩu ${geometryType}`;
 
       if (geometryType === 'Polygon' || geometryType === 'MultiPolygon') {
+        const sanitizedGeometry = sanitizeGeoJSONGeometry(feature.geometry);
+        if (!sanitizedGeometry) {
+          console.warn('Skipping invalid polygon geometry for feature:', name);
+          continue;
+        }
+
         await Zone.create({
-          geometry: feature.geometry,
+          geometry: sanitizedGeometry,
           properties: {
             name,
             area: properties.area || 0,
@@ -136,8 +174,11 @@ export async function importFeatures(features: any[]) {
         });
         zoneCount++;
       } else if (geometryType === 'Point') {
+        const sanitizedGeometry = sanitizeGeoJSONGeometry(feature.geometry);
+        if (!sanitizedGeometry) continue;
+
         await POI.create({
-          geometry: feature.geometry,
+          geometry: sanitizedGeometry,
           properties: {
             name,
             notes: properties.notes || '',

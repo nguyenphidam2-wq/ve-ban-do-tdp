@@ -30,6 +30,22 @@ const POLY_COLORS = [
 
 // Helper to construct custom HTML icons based on type
 const getPoiIcon = (type: string) => {
+  if (type === 'tdp_label') {
+    return L.divIcon({
+      html: `<div class="flex items-center justify-center text-base bg-blue-600 border-2 border-blue-200 text-white rounded-full w-8 h-8 shadow-lg shadow-blue-500/40 hover:scale-110 transition-transform cursor-pointer" title="Điểm Nhãn Tổ Dân Phố">🏷️</div>`,
+      className: 'custom-poi-icon',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+  }
+  if (type === 'community_house') {
+    return L.divIcon({
+      html: `<div class="flex items-center justify-center text-base bg-emerald-600 border-2 border-emerald-200 text-white rounded-full w-8 h-8 shadow-lg shadow-emerald-500/40 hover:scale-110 transition-transform cursor-pointer" title="Nhà Sinh Hoạt Cộng Đồng">🏛️</div>`,
+      className: 'custom-poi-icon',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+  }
   const emojis: Record<string, string> = {
     warning: '⚠️',
     info: 'ℹ️',
@@ -43,6 +59,7 @@ const getPoiIcon = (type: string) => {
     iconAnchor: [16, 16]
   });
 };
+
 
 // Custom component to initialize Geoman and handle events
 const MapController = ({ 
@@ -201,8 +218,11 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   // Layer visibility toggles
   const [showZones, setShowZones] = useState(true);
   const [showPois, setShowPois] = useState(true);
+  const [showTdpLabels, setShowTdpLabels] = useState(true);
+  const [showCommunityHouses, setShowCommunityHouses] = useState(true);
   
   const [currentLayer, setCurrentLayer] = useState<any>(null);
+
   const [currentPoiLayer, setCurrentPoiLayer] = useState<any>(null);
   
   const [initialData, setInitialData] = useState<any>(null);
@@ -266,7 +286,20 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       }
     };
 
+    const handleToggleTdpLabels = (e: any) => {
+      if (e.detail) {
+        setShowTdpLabels(e.detail.visible);
+      }
+    };
+
+    const handleToggleCommunityHouses = (e: any) => {
+      if (e.detail) {
+        setShowCommunityHouses(e.detail.visible);
+      }
+    };
+
     // Attach global delete handler for raw HTML popups
+
     (window as any).deleteZoneFromMap = async (id: string) => {
       if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
         const res = await deleteZone(id);
@@ -296,6 +329,8 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     window.addEventListener('map-change-layer', handleLayerChange);
     window.addEventListener('map-toggle-zones', handleToggleZones);
     window.addEventListener('map-toggle-pois', handleTogglePois);
+    window.addEventListener('map-toggle-tdp-labels', handleToggleTdpLabels);
+    window.addEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
 
     return () => {
       delete (window as any).deleteZoneFromMap;
@@ -304,6 +339,8 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       window.removeEventListener('map-change-layer', handleLayerChange);
       window.removeEventListener('map-toggle-zones', handleToggleZones);
       window.removeEventListener('map-toggle-pois', handleTogglePois);
+      window.removeEventListener('map-toggle-tdp-labels', handleToggleTdpLabels);
+      window.removeEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
     };
   }, [refreshAllData, zones]);
 
@@ -547,6 +584,8 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           const coords = poi.geometry?.coordinates;
           const props = poi.properties || {};
           if (!coords || coords.length < 2) return null;
+          if (props.type === 'tdp_label' && !showTdpLabels) return null;
+          if (props.type === 'community_house' && !showCommunityHouses) return null;
           return (
             <Marker
               key={poi._id || idx}
@@ -556,7 +595,9 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
               <Popup className="custom-leaflet-popup">
                 <div className="p-3 min-w-[200px] bg-slate-950 text-white rounded-xl border border-white/10 shadow-2xl">
                   <h3 className="text-yellow-400 font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2 text-sm">
-                    {props.type === 'warning' ? '⚠️' : props.type === 'info' ? 'ℹ️' : props.type === 'camera' ? '📹' : '🚒'} {props.name || 'Điểm chú ý'}
+                    {props.type === 'tdp_label' ? '🏷️ ĐIỂM NHÃN TỔ' :
+                     props.type === 'community_house' ? '🏛️ NHÀ SHCĐ' :
+                     props.type === 'warning' ? '⚠️' : props.type === 'info' ? 'ℹ️' : props.type === 'camera' ? '📹' : '🚒'} {props.name || 'Điểm chú ý'}
                   </h3>
                   <p className="text-xs text-white/80 leading-relaxed font-medium py-1">
                     {props.notes || 'Không có ghi chú.'}
@@ -614,6 +655,39 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           onDrawingStateChange={setIsDrawing}
         />
       </MapContainer>
+
+      {/* Quick Filter Bar for POI & Zone Toggles */}
+      <div className="absolute top-4 right-4 z-[1000] flex flex-wrap items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 shadow-2xl">
+        <button
+          onClick={() => setShowZones(!showZones)}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            showZones ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-white/5 text-white/40 hover:bg-white/10'
+          }`}
+          title="Ẩn/Hiện Ranh giới Tổ Dân Phố"
+        >
+          <span>🗺️</span> Ranh giới Tổ ({zones.length})
+        </button>
+
+        <button
+          onClick={() => setShowTdpLabels(!showTdpLabels)}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            showTdpLabels ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30' : 'bg-white/5 text-white/40 hover:bg-white/10'
+          }`}
+          title="Ẩn/Hiện Điểm Nhãn Tổ Dân Phố"
+        >
+          <span>🏷️</span> Nhãn Tổ ({pois.filter(p => p.properties?.type === 'tdp_label').length})
+        </button>
+
+        <button
+          onClick={() => setShowCommunityHouses(!showCommunityHouses)}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            showCommunityHouses ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-white/5 text-white/40 hover:bg-white/10'
+          }`}
+          title="Ẩn/Hiện Nhà Sinh Hoạt Cộng Đồng"
+        >
+          <span>🏛️</span> Nhà SHCĐ ({pois.filter(p => p.properties?.type === 'community_house').length})
+        </button>
+      </div>
 
       {/* Floating deactivation buttons for normal drawing */}
       {isDrawing && (
