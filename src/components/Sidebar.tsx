@@ -369,6 +369,12 @@ export default function Sidebar() {
                   >
                     📍 Cắm mốc chú ý (Karaoke, PCCC...)
                   </button>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-merge-modal'))}
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-cyan-600/20 transition-all hover:scale-[1.02] cursor-pointer border border-cyan-400/30"
+                  >
+                    🧩 Sáp nhập TDP & Khóa ranh giới
+                  </button>
                 </div>
               </div>
             )}
@@ -417,24 +423,30 @@ export default function Sidebar() {
                             <h4 className="font-bold text-sm text-white group-hover:text-primary transition-colors">
                               {props.name || 'Không tên'}
                             </h4>
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (confirm(`Bạn có chắc chắn muốn xóa ${props.name || 'Tổ dân phố này'} không?`)) {
-                                  const res = await deleteZone(zone._id);
-                                  if (res.success) {
-                                    fetchZones();
-                                    window.dispatchEvent(new CustomEvent('zone-saved'));
-                                  } else {
-                                    alert('Lỗi khi xóa: ' + res.error);
+                            {props.isFrozen ? (
+                              <span className="p-1 text-cyan-400 text-xs font-bold" title="Ranh giới đã đóng băng chính thức">
+                                🔒 Đã khóa
+                              </span>
+                            ) : (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Bạn có chắc chắn muốn xóa ${props.name || 'Tổ dân phố này'} không?`)) {
+                                    const res = await deleteZone(zone._id);
+                                    if (res.success) {
+                                      fetchZones();
+                                      window.dispatchEvent(new CustomEvent('zone-saved'));
+                                    } else {
+                                      alert('Lỗi khi xóa: ' + res.error);
+                                    }
                                   }
-                                }
-                              }}
-                              className="p-1 text-white/40 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                              title="Xóa ranh giới"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                                }}
+                                className="p-1 text-white/40 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                title="Xóa ranh giới"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                           <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-white/50">
                             <div>📐 {props.area || 0} ha</div>

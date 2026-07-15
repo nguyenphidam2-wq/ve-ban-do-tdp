@@ -52,6 +52,11 @@ export default function TdpMergeModal({ isOpen, onClose, zones, onSuccess }: Tdp
   }, [selectedZones]);
 
   const handleToggleSelect = (id: string) => {
+    const zone = zones.find(z => z._id === id);
+    if (zone && zone.properties?.isFrozen) {
+      alert('Không thể chọn Tổ dân phố đã đóng băng chính thức để sáp nhập.');
+      return;
+    }
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
@@ -60,6 +65,11 @@ export default function TdpMergeModal({ isOpen, onClose, zones, onSuccess }: Tdp
   const handleMerge = async () => {
     if (selectedZones.length < 2) {
       alert('Vui lòng chọn ít nhất 2 Tổ dân phố để thực hiện sáp nhập.');
+      return;
+    }
+
+    if (selectedZones.some(z => z.properties?.isFrozen)) {
+      alert('Không thể thực hiện sáp nhập vì có ranh giới Tổ dân phố đã bị đóng băng chính thức.');
       return;
     }
 
@@ -226,27 +236,37 @@ export default function TdpMergeModal({ isOpen, onClose, zones, onSuccess }: Tdp
                 ) : (
                   filteredZones.map((zone) => {
                     const isChecked = selectedIds.includes(zone._id);
+                    const isFrozen = !!zone.properties?.isFrozen;
                     return (
                       <div
                         key={zone._id}
-                        onClick={() => handleToggleSelect(zone._id)}
-                        className={`p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
-                          isChecked
-                            ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10'
-                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                        onClick={() => {
+                          if (isFrozen) {
+                            alert('Không thể chọn Tổ dân phố đã đóng băng chính thức để sáp nhập.');
+                            return;
+                          }
+                          handleToggleSelect(zone._id);
+                        }}
+                        className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                          isFrozen
+                            ? 'opacity-40 cursor-not-allowed bg-black/20 border-white/5'
+                            : isChecked
+                            ? 'bg-primary/20 border-primary shadow-lg shadow-primary/10 cursor-pointer'
+                            : 'bg-white/5 border-white/10 hover:border-white/20 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           <input
                             type="checkbox"
                             checked={isChecked}
+                            disabled={isFrozen}
                             onChange={() => {}}
-                            className="rounded border-white/20 bg-white/10 text-primary w-4 h-4"
+                            className="rounded border-white/20 bg-white/10 text-primary w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                           <div>
                             <div className="text-xs font-bold flex items-center gap-2">
                               <span>{zone.properties?.name || 'Tổ dân phố không tên'}</span>
-                              {zone.properties?.isFrozen && (
+                              {isFrozen && (
                                 <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded border border-cyan-500/30">
                                   🔒 Đã khóa
                                 </span>

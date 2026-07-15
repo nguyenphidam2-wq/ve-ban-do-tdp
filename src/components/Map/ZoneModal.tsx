@@ -14,6 +14,7 @@ interface ZoneData {
   cskv: string;
   phone: string;
   notes: string;
+  isFrozen?: boolean;
 }
 
 interface ZoneModalProps {
@@ -56,8 +57,10 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
     }
   }, [initialData, isOpen]);
 
-  if (!isOpen) return null;
+  const isFrozen = isEdit && !!initialData?.isFrozen;
 
+  if (!isOpen) return null;
+ 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-white/10 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -80,29 +83,37 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
             <X size={20} />
           </button>
         </div>
-
+ 
         {/* Body */}
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+          {isFrozen && (
+            <div className="p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs flex items-center gap-2 font-semibold">
+              <span>🔒</span>
+              <span>Ranh giới này đang ở chế độ Đóng băng chính thức (Khóa tọa độ nghiệm thu).</span>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Tên tổ dân phố (ví dụ: Tổ dân phố 1)</label>
             <input 
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="VD: Tổ dân phố 1"
+              disabled={isFrozen}
             />
           </div>
-
+ 
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Họ tên cán bộ vẽ</label>
             <input 
               value={formData.officer}
               onChange={e => setFormData({ ...formData, officer: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="Họ và tên cán bộ vẽ"
+              disabled={isFrozen}
             />
           </div>
-
+ 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Số hộ</label>
@@ -110,7 +121,8 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
                 type="number"
                 value={formData.households}
                 onChange={e => setFormData({ ...formData, households: parseInt(e.target.value) || 0 })}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isFrozen}
               />
             </div>
             <div className="space-y-1.5">
@@ -119,7 +131,8 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
                 type="number"
                 value={formData.population}
                 onChange={e => setFormData({ ...formData, population: parseInt(e.target.value) || 0 })}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isFrozen}
               />
             </div>
             <div className="space-y-1.5">
@@ -132,7 +145,7 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
               />
             </div>
           </div>
-
+ 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Cán bộ CSKV</label>
@@ -141,8 +154,9 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
                 <input 
                   value={formData.cskv}
                   onChange={e => setFormData({ ...formData, cskv: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Tên CSKV"
+                  disabled={isFrozen}
                 />
               </div>
             </div>
@@ -153,24 +167,26 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
                 <input 
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="09xxx..."
+                  disabled={isFrozen}
                 />
               </div>
             </div>
           </div>
-
+ 
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase font-bold text-white/30 ml-1">Ghi chú bản vẽ / Mô tả</label>
             <textarea 
               value={formData.notes}
               onChange={e => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 transition-colors min-h-[100px] resize-none"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 transition-colors min-h-[100px] resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="Nhập ghi chú hoặc mô tả chi tiết cho vùng bản đồ này..."
+              disabled={isFrozen}
             />
           </div>
         </div>
-
+ 
         {/* Footer */}
         <div className="p-6 bg-slate-800/30 border-t border-white/5 flex gap-3">
           <button 
@@ -186,10 +202,11 @@ export default function ZoneModal({ isOpen, onClose, onSave, initialData, isEdit
               }
               onSave(formData);
             }}
-            className="flex-1 px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center gap-2 cursor-pointer"
+            disabled={isFrozen}
+            className="flex-1 px-6 py-3 rounded-xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-700"
           >
             <Save size={18} />
-            {isEdit ? 'Cập nhật dữ liệu' : 'Lưu dữ liệu'}
+            {isFrozen ? 'Đang đóng băng' : isEdit ? 'Cập nhật dữ liệu' : 'Lưu dữ liệu'}
           </button>
         </div>
       </div>

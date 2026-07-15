@@ -7,6 +7,7 @@ import '@geoman-io/leaflet-geoman-free';
 import * as turf from '@turf/turf';
 import ZoneModal from './ZoneModal';
 import PoiModal from './PoiModal';
+import TdpMergeModal from './TdpMergeModal';
 import { saveZone, getZones, savePoi, getPois, deleteZone, deletePoi, updateZoneProperties, updatePoiProperties } from '@/app/actions';
 
 // Fix default Leaflet marker icon asset resolution paths in Next.js
@@ -209,6 +210,7 @@ interface GISMapProps {
 export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISMapProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [poiModalOpen, setPoiModalOpen] = useState(false);
+  const [mergeModalOpen, setMergeModalOpen] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   
   // Edit states for Zone and POI
@@ -301,6 +303,11 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     // Attach global delete handler for raw HTML popups
 
     (window as any).deleteZoneFromMap = async (id: string) => {
+      const zoneToDelete = zones.find(z => z._id === id);
+      if (zoneToDelete && zoneToDelete.properties?.isFrozen) {
+        alert('Không thể xóa ranh giới đã đóng băng chính thức.');
+        return;
+      }
       if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
         const res = await deleteZone(id);
         if (res.success) {
@@ -316,6 +323,10 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     (window as any).editZoneFromMap = (id: string) => {
       const zoneToEdit = zones.find(z => z._id === id);
       if (zoneToEdit) {
+        if (zoneToEdit.properties?.isFrozen) {
+          alert('Không thể sửa ranh giới đã đóng băng chính thức.');
+          return;
+        }
         setIsEdit(true);
         setInitialData({
           _id: zoneToEdit._id,
@@ -324,6 +335,9 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         setModalOpen(true);
       }
     };
+
+    const handleOpenMergeModal = () => setMergeModalOpen(true);
+    window.addEventListener('open-merge-modal', handleOpenMergeModal);
 
     window.addEventListener('zone-saved', refreshAllData);
     window.addEventListener('map-change-layer', handleLayerChange);
@@ -335,6 +349,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     return () => {
       delete (window as any).deleteZoneFromMap;
       delete (window as any).editZoneFromMap;
+      window.removeEventListener('open-merge-modal', handleOpenMergeModal);
       window.removeEventListener('zone-saved', refreshAllData);
       window.removeEventListener('map-change-layer', handleLayerChange);
       window.removeEventListener('map-toggle-zones', handleToggleZones);
@@ -513,7 +528,9 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                 color: POLY_COLORS[idx % POLY_COLORS.length],
                 fillColor: POLY_COLORS[idx % POLY_COLORS.length],
                 fillOpacity: 0.3,
-                weight: 2
+                weight: 2,
+                // @ts-ignore
+                pmIgnore: !!zone.properties?.isFrozen
               }}
             >
               <Popup className="custom-leaflet-popup">
@@ -534,45 +551,53 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                     </div>
                   )}
                   <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
-                    <button 
-                      ref={(el) => {
-                        if (el) {
-                          el.onclick = (e) => {
-                            e.stopPropagation();
-                            setIsEdit(true);
-                            setInitialData({
-                              _id: zone._id,
-                              ...zone.properties
-                            });
-                            setModalOpen(true);
-                          };
-                        }
-                      }}
-                      className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
-                    >
-                      ✏️ Sửa
-                    </button>
-                    <button 
-                      ref={(el) => {
-                        if (el) {
-                          el.onclick = async (e) => {
-                            e.stopPropagation();
-                            if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
-                              const res = await deleteZone(zone._id);
-                              if (res.success) {
-                                refreshAllData();
-                                window.dispatchEvent(new CustomEvent('zone-saved'));
-                              } else {
-                                alert('Lỗi khi xóa: ' + res.error);
-                              }
+                    {zone.properties?.isFrozen ? (
+                      <div className="w-full text-center py-2 bg-cyan-950/80 border border-cyan-800/40 text-cyan-300 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5">
+                        <span>🔒 Ranh giới đã đóng băng</span>
+                      </div>
+                    ) : (
+                      <>
+                        <button 
+                          ref={(el) => {
+                            if (el) {
+                              el.onclick = (e) => {
+                                e.stopPropagation();
+                                setIsEdit(true);
+                                setInitialData({
+                                  _id: zone._id,
+                                  ...zone.properties
+                                });
+                                setModalOpen(true);
+                              };
                             }
-                          };
-                        }
-                      }}
-                      className="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
-                    >
-                      🗑️ Xóa
-                    </button>
+                          }}
+                          className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                          ✏️ Sửa
+                        </button>
+                        <button 
+                          ref={(el) => {
+                            if (el) {
+                              el.onclick = async (e) => {
+                                e.stopPropagation();
+                                if (confirm('Bạn có chắc chắn muốn xóa tổ dân phố này không?')) {
+                                  const res = await deleteZone(zone._id);
+                                  if (res.success) {
+                                    refreshAllData();
+                                    window.dispatchEvent(new CustomEvent('zone-saved'));
+                                  } else {
+                                    alert('Lỗi khi xóa: ' + res.error);
+                                  }
+                                }
+                              };
+                            }
+                          }}
+                          className="py-1.5 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                          🗑️ Xóa
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </Popup>
@@ -715,6 +740,13 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         onSave={handleSavePoi}
         initialData={poiInitialData}
         isEdit={isPoiEdit}
+      />
+
+      <TdpMergeModal
+        isOpen={mergeModalOpen}
+        onClose={() => setMergeModalOpen(false)}
+        zones={zones}
+        onSuccess={refreshAllData}
       />
     </div>
   );

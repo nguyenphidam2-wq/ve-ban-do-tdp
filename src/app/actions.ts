@@ -65,6 +65,13 @@ export async function getPois() {
 export async function deleteZone(id: string) {
   try {
     await dbConnect();
+    
+    // Check if the zone is frozen
+    const existingZone = await Zone.findById(id);
+    if (existingZone && existingZone.properties?.isFrozen) {
+      return { success: false, error: 'Ranh giới đã bị đóng băng chính thức, không thể xóa.' };
+    }
+
     await Zone.findByIdAndDelete(id);
     revalidatePath('/');
     return { success: true };
@@ -119,6 +126,13 @@ export async function deleteAllFeatures() {
 export async function updateZoneProperties(id: string, properties: any) {
   try {
     await dbConnect();
+    
+    // Check if the zone is frozen
+    const existingZone = await Zone.findById(id);
+    if (existingZone && existingZone.properties?.isFrozen) {
+      return { success: false, error: 'Ranh giới đã bị đóng băng chính thức, không thể cập nhật.' };
+    }
+
     await Zone.findByIdAndUpdate(id, { $set: { properties } });
     revalidatePath('/');
     return { success: true };
@@ -205,6 +219,13 @@ export async function importFeatures(features: any[]) {
 export async function mergeZones(selectedIds: string[], mergedGeometry: any, newProperties: any, deleteOld: boolean = true) {
   try {
     await dbConnect();
+
+    // Check if any of the selected zones are frozen
+    const frozenCount = await Zone.countDocuments({ _id: { $in: selectedIds }, 'properties.isFrozen': true });
+    if (frozenCount > 0) {
+      return { success: false, error: 'Không thể sáp nhập do có ranh giới đang bị đóng băng chính thức.' };
+    }
+
     const sanitizedGeometry = sanitizeGeoJSONGeometry(mergedGeometry) || mergedGeometry;
 
     const newZone = await Zone.create({
