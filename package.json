@@ -14,6 +14,7 @@
     "@types/leaflet": "^1.9.12",
     "autoprefixer": "^10.5.0",
     "clsx": "^2.1.1",
+    "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.378.0",

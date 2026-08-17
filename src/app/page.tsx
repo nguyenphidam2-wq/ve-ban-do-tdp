@@ -31,23 +31,7 @@ export default function Home() {
         <GISMap />
       </div>
 
-      {/* Floating UI Elements (Overlays) - Hidden on Mobile */}
-      <div className="absolute top-4 right-4 z-[1000] hidden md:flex flex-col gap-2">
-        <div className="glass-morphism p-3 rounded-xl flex items-center gap-4 shadow-xl">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-white/40 uppercase font-bold">Chế độ Snapping</span>
-            <span className="text-xs font-medium text-green-400 flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              Hoạt động (20px)
-            </span>
-          </div>
-          <div className="w-px h-8 bg-white/10"></div>
-          <div className="flex flex-col">
-            <span className="text-[10px] text-white/40 uppercase font-bold">Topological Integrity</span>
-            <span className="text-xs font-medium text-blue-400 italic">No Overlaps Active</span>
-          </div>
-        </div>
-      </div>
+
 
       {/* Floating Action Button */}
       <div className="absolute bottom-6 right-6 md:bottom-10 md:right-10 z-[1000]">

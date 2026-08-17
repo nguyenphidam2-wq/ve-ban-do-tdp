@@ -5,6 +5,7 @@ import L from 'leaflet';
 import '@geoman-io/leaflet-geoman-free';
 // @ts-ignore
 import * as turf from '@turf/turf';
+import { toPng } from 'html-to-image';
 import ZoneModal from './ZoneModal';
 import PoiModal from './PoiModal';
 import TdpMergeModal from './TdpMergeModal';
@@ -252,6 +253,50 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     }
   }, []);
   
+  // Capture map snapshot state
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const handleCaptureMap = useCallback(async () => {
+    try {
+      setIsCapturing(true);
+      const mapContainer = document.querySelector('.leaflet-container') as HTMLElement;
+      if (!mapContainer) {
+        alert('Không tìm thấy bản đồ.');
+        setIsCapturing(false);
+        return;
+      }
+
+      const dataUrl = await toPng(mapContainer, {
+        cacheBust: true,
+        pixelRatio: 2,
+        filter: (node: any) => {
+          if (node.classList && (
+            node.classList.contains('leaflet-control-container') ||
+            node.classList.contains('leaflet-control-zoom') ||
+            node.classList.contains('leaflet-pm-toolbar')
+          )) {
+            return false;
+          }
+          return true;
+        }
+      });
+
+      const link = document.createElement('a');
+      const timeStr = new Date().toISOString().slice(0, 10);
+      link.download = `Ban_Do_Phuong_Lien_Chieu_${timeStr}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Lỗi chụp ảnh bản đồ:', err);
+      // Fallback to opening printable map or inform user
+      window.open('/Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf', '_blank');
+    } finally {
+      setIsCapturing(false);
+    }
+  }, []);
+
   const [currentLayer, setCurrentLayer] = useState<any>(null);
 
   const [currentPoiLayer, setCurrentPoiLayer] = useState<any>(null);
@@ -871,8 +916,24 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         </button>
       </div>
 
-      {/* Quick Filter Bar for POI & Zone Toggles & Direct PDF Downloads */}
+      {/* Quick Filter Bar for POI & Zone Toggles & Direct PDF/Image Downloads */}
       <div className="absolute top-4 right-4 z-[1000] flex flex-wrap items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 shadow-2xl">
+        <button
+          onClick={handleCaptureMap}
+          disabled={isCapturing}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            isCapturing
+              ? 'bg-purple-700 text-white animate-pulse'
+              : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/30 ring-1 ring-purple-400/50'
+          }`}
+          title="Chụp & Xuất ảnh Bản đồ Phường Liên Chiểu (PNG Độ nét cao)"
+        >
+          <span>📷</span>
+          <span>{isCapturing ? 'Đang chụp...' : 'Chụp ảnh Bản đồ'}</span>
+        </button>
+
+        <div className="w-px h-5 bg-white/20 hidden sm:block"></div>
+
         <a
           href="/Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
           download="Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
