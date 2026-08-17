@@ -197,11 +197,25 @@ export default function Sidebar() {
     };
     window.addEventListener('map-toggle-old-tdp', handleToggleOldTdpEvent);
 
+    const handleModeChanged = (e: any) => {
+      if (e.detail && e.detail.mode) {
+        if (e.detail.mode === 'old') {
+          setShowOldTdp(true);
+        } else if (e.detail.mode === 'new') {
+          setShowOldTdp(false);
+        } else if (e.detail.mode === 'overlay') {
+          setShowOldTdp(true);
+        }
+      }
+    };
+    window.addEventListener('map-mode-changed', handleModeChanged);
+
     // Listen for save events to refresh the sidebar list
     window.addEventListener('zone-saved', fetchZones);
     return () => {
       window.removeEventListener('zone-saved', fetchZones);
       window.removeEventListener('map-toggle-old-tdp', handleToggleOldTdpEvent);
+      window.removeEventListener('map-mode-changed', handleModeChanged);
     };
   }, [fetchZones]);
 
@@ -256,15 +270,17 @@ export default function Sidebar() {
   });
 
   const navItems = [
-    { id: 'map', icon: MapIcon, label: 'Bản đồ số' },
-    { id: 'old_tdp', icon: History, label: 'Bản đồ Liên Chiểu 95 tổ dân phố cũ' },
+    { id: 'map', icon: MapIcon, label: 'Bản đồ số (27 TDP)' },
+    { id: 'old_tdp', icon: History, label: 'Bản đồ 95 TDP cũ' },
     { id: 'data', icon: Database, label: 'Danh sách tổ dân phố' },
   ];
 
   const handleNavClick = (tabId: string) => {
     setTab(tabId);
     if (tabId === 'old_tdp') {
-      handleToggleOldTdp(true);
+      window.dispatchEvent(new CustomEvent('map-set-mode', { detail: { mode: 'old' } }));
+    } else if (tabId === 'map') {
+      window.dispatchEvent(new CustomEvent('map-set-mode', { detail: { mode: 'new' } }));
     }
   };
 
@@ -306,7 +322,7 @@ export default function Sidebar() {
               <Layers className="text-white w-6 h-6" />
             </div>
             <div>
-              <h1 className="font-bold text-base leading-none text-white">Vẽ bản đồ số Liên Chiểu</h1>
+              <h1 className="font-bold text-base leading-none text-white">BẢN ĐỒ PHƯỜNG LIÊN CHIỂU</h1>
               <p className="text-xs text-white/50 mt-1">Hệ thống số hóa v1.0</p>
             </div>
           </div>

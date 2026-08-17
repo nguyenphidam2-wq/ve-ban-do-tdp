@@ -217,6 +217,9 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   const [isEdit, setIsEdit] = useState(false);
   const [isPoiEdit, setIsPoiEdit] = useState(false);
 
+  // Master Layer Mode: 'new' (27 TDPs) | 'old' (95 TDPs) | 'overlay' (Both)
+  const [mapMode, setMapMode] = useState<'new' | 'old' | 'overlay'>('new');
+
   // Layer visibility toggles
   const [showZones, setShowZones] = useState(true);
   const [showPois, setShowPois] = useState(true);
@@ -224,6 +227,30 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   const [showCommunityHouses, setShowCommunityHouses] = useState(true);
   const [showOldTdp, setShowOldTdp] = useState(false);
   const [oldTdpFeatures, setOldTdpFeatures] = useState<any[]>([]);
+
+  // Function to switch master modes
+  const handleSetMapMode = useCallback((mode: 'new' | 'old' | 'overlay') => {
+    setMapMode(mode);
+    if (mode === 'new') {
+      setShowZones(true);
+      setShowTdpLabels(true);
+      setShowCommunityHouses(true);
+      setShowOldTdp(false);
+      window.dispatchEvent(new CustomEvent('map-mode-changed', { detail: { mode: 'new' } }));
+    } else if (mode === 'old') {
+      setShowZones(false);
+      setShowTdpLabels(false);
+      setShowCommunityHouses(false);
+      setShowOldTdp(true);
+      window.dispatchEvent(new CustomEvent('map-mode-changed', { detail: { mode: 'old' } }));
+    } else if (mode === 'overlay') {
+      setShowZones(true);
+      setShowTdpLabels(true);
+      setShowCommunityHouses(true);
+      setShowOldTdp(true);
+      window.dispatchEvent(new CustomEvent('map-mode-changed', { detail: { mode: 'overlay' } }));
+    }
+  }, []);
   
   const [currentLayer, setCurrentLayer] = useState<any>(null);
 
@@ -365,6 +392,29 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     window.addEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
     window.addEventListener('map-toggle-old-tdp', handleToggleOldTdp);
 
+    const handleExternalSetMode = (e: any) => {
+      if (e.detail && e.detail.mode) {
+        handleSetMapMode(e.detail.mode);
+      }
+    };
+    window.addEventListener('map-set-mode', handleExternalSetMode);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (e.key === '1') {
+        handleSetMapMode('new');
+      } else if (e.key === '2') {
+        handleSetMapMode('old');
+      } else if (e.key === '3' || (e.code === 'Space' && !e.repeat)) {
+        e.preventDefault();
+        handleSetMapMode('overlay');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       delete (window as any).deleteZoneFromMap;
       delete (window as any).editZoneFromMap;
@@ -376,8 +426,10 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       window.removeEventListener('map-toggle-tdp-labels', handleToggleTdpLabels);
       window.removeEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
       window.removeEventListener('map-toggle-old-tdp', handleToggleOldTdp);
+      window.removeEventListener('map-set-mode', handleExternalSetMode);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [refreshAllData, zones]);
+  }, [refreshAllData, zones, handleSetMapMode]);
 
   // ponytail: periodic polling to fetch latest updates every 30 seconds for concurrent drawers
   useEffect(() => {
@@ -773,6 +825,51 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           onDrawingStateChange={setIsDrawing}
         />
       </MapContainer>
+
+      {/* Hallmark Tactical Master Mode Switcher (Top Center) */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] hidden sm:flex items-center gap-1 bg-slate-950/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/15 shadow-2xl shadow-black/80">
+        <button
+          onClick={() => handleSetMapMode('new')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mapMode === 'new'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+              : 'text-white/60 hover:text-white hover:bg-white/5'
+          }`}
+          title="Chế độ 27 TDP Mới (Phím tắt: 1)"
+        >
+          <span>🗺️</span>
+          <span>27 TDP Mới</span>
+          <kbd className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${mapMode === 'new' ? 'bg-blue-700/90 text-white' : 'bg-white/10 text-white/40'}`}>1</kbd>
+        </button>
+
+        <button
+          onClick={() => handleSetMapMode('old')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mapMode === 'old'
+              ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/30'
+              : 'text-white/60 hover:text-white hover:bg-white/5'
+          }`}
+          title="Chế độ 95 TDP Cũ (Phím tắt: 2)"
+        >
+          <span>📜</span>
+          <span>95 TDP Cũ</span>
+          <kbd className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${mapMode === 'old' ? 'bg-amber-700/90 text-white' : 'bg-white/10 text-white/40'}`}>2</kbd>
+        </button>
+
+        <button
+          onClick={() => handleSetMapMode('overlay')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            mapMode === 'overlay'
+              ? 'bg-gradient-to-r from-blue-600 to-amber-600 text-white shadow-lg shadow-blue-500/20'
+              : 'text-white/60 hover:text-white hover:bg-white/5'
+          }`}
+          title="So sánh Chồng 2 Lớp (Phím tắt: 3 hoặc Space)"
+        >
+          <span>🔀</span>
+          <span>So sánh 2 Lớp</span>
+          <kbd className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${mapMode === 'overlay' ? 'bg-black/30 text-white' : 'bg-white/10 text-white/40'}`}>3</kbd>
+        </button>
+      </div>
 
       {/* Quick Filter Bar for POI & Zone Toggles */}
       <div className="absolute top-4 right-4 z-[1000] flex flex-wrap items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 shadow-2xl">
