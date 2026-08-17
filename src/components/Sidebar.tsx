@@ -644,6 +644,22 @@ export default function Sidebar() {
                 </button>
 
                 <a
+                  href="/Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+                  download="Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+                  className="w-full flex items-center justify-center gap-2 p-2.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
+                >
+                  <span>📄</span> Tải PDF Bản đồ 27 TDP Mới (.pdf)
+                </a>
+
+                <a
+                  href="/Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+                  download="Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+                  className="w-full flex items-center justify-center gap-2 p-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
+                >
+                  <span>📜</span> Tải PDF Bản đồ 95 TDP Cũ (.pdf)
+                </a>
+
+                <a
                   href="/Danh_sach_57_Diem_Chu_Y_TDP_25_6.xlsx"
                   download="Danh_sach_57_Diem_Chu_Y_TDP_25_6.xlsx"
                   className="w-full flex items-center justify-center gap-2 p-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
