@@ -724,76 +724,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           );
         })}
 
-        {showPois && pois.map((poi, idx) => {
-          const coords = poi.geometry?.coordinates;
-          const props = poi.properties || {};
-          if (!coords || coords.length < 2) return null;
-          if (props.type === 'tdp_label' && !showTdpLabels) return null;
-          if (props.type === 'community_house' && !showCommunityHouses) return null;
-          return (
-            <Marker
-              key={poi._id || idx}
-              position={[coords[1], coords[0]]}
-              icon={getPoiIcon(props.type)}
-            >
-              <Popup className="custom-leaflet-popup">
-                <div className="p-3 min-w-[200px] bg-slate-950 text-white rounded-xl border border-white/10 shadow-2xl">
-                  <h3 className="text-yellow-400 font-bold border-b border-white/10 pb-2 mb-2 flex items-center gap-2 text-sm">
-                    {props.type === 'tdp_label' ? '🏷️ ĐIỂM NHÃN TỔ' :
-                     props.type === 'community_house' ? '🏛️ NHÀ SHCĐ' :
-                     props.type === 'warning' ? '⚠️' : props.type === 'info' ? 'ℹ️' : props.type === 'camera' ? '📹' : '🚒'} {props.name || 'Điểm chú ý'}
-                  </h3>
-                  <p className="text-xs text-white/80 leading-relaxed font-medium py-1">
-                    {props.notes || 'Không có ghi chú.'}
-                  </p>
-                  <div className="mt-3 pt-2 border-t border-white/10 flex gap-2">
-                    <button 
-                      ref={(el) => {
-                        if (el) {
-                          el.onclick = (e) => {
-                            e.stopPropagation();
-                            handleStartEditPoi(poi);
-                          };
-                        }
-                      }}
-                      className="flex-1 py-1.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
-                    >
-                      ✏️ Sửa
-                    </button>
-                    <button 
-                      ref={(el) => {
-                        if (el) {
-                          el.onclick = async (e) => {
-                            e.stopPropagation();
-                            if (confirm('Bạn có chắc chắn muốn xóa mốc ghi chú này không?')) {
-                              const res = await deletePoi(poi._id);
-                              if (res.success) {
-                                refreshAllData();
-                                window.dispatchEvent(new CustomEvent('zone-saved'));
-                              } else {
-                                alert('Lỗi khi xóa: ' + res.error);
-                              }
-                            }
-                          };
-                        }
-                      }}
-                      className="py-1.5 px-2 bg-red-600/80 hover:bg-red-600 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
-                    >
-                      🗑️ Xóa
-                    </button>
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-white/30 uppercase tracking-widest text-right">
-                    Số hóa GIS
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-        
-
-
-        {/* Render 95 Old TDP Boundaries & POIs */}
+        {/* Render 95 Old TDP Boundaries Only (Polygons) */}
         {showOldTdp && oldTdpFeatures.map((feat: any, idx: number) => {
           if (feat.geometry?.type === 'Polygon' || feat.geometry?.type === 'MultiPolygon') {
             const positions = getPolygonPositions(feat.geometry);
@@ -835,32 +766,6 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
                   </div>
                 </Popup>
               </Polygon>
-            );
-          } else if (feat.geometry?.type === 'Point') {
-            const coords = feat.geometry.coordinates;
-            const props = feat.properties || {};
-            if (!coords || coords.length < 2) return null;
-            return (
-              <Marker
-                key={feat.id || `old_poi_${idx}`}
-                position={[coords[1], coords[0]]}
-                icon={L.divIcon({
-                  html: `<div class="flex items-center justify-center text-xs font-bold bg-amber-500 text-slate-950 border border-white rounded-full w-7 h-7 shadow-lg hover:scale-110 transition-transform cursor-pointer" title="${props.name}">📍</div>`,
-                  className: 'custom-poi-icon',
-                  iconSize: [28, 28],
-                  iconAnchor: [14, 14]
-                })}
-              >
-                <Popup className="custom-leaflet-popup">
-                  <div className="p-3 min-w-[200px] bg-slate-950 text-white rounded-xl border border-amber-500/40 shadow-2xl">
-                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Mốc chú ý (95 TDP cũ)</span>
-                    <h3 className="font-bold text-sm text-white mt-1">{props.name}</h3>
-                    {props.description && (
-                      <p className="text-xs text-white/70 mt-1 leading-relaxed">{props.description}</p>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
             );
           }
           return null;
