@@ -12,7 +12,8 @@ import {
   Download,
   Upload,
   Trash2,
-  History
+  History,
+  Camera
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -433,16 +434,27 @@ export default function Sidebar() {
                   </label>
                 </div>
 
-                {/* Direct PDF Download Button for 27 New TDPs */}
-                <a
-                  href="/Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
-                  download="Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
-                >
-                  <Download className="w-4 h-4" /> Tải Bản đồ PDF 27 TDP Mới (Google Maps)
-                </a>
+                {/* Action Buttons for 27 New TDPs */}
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('trigger-map-capture'));
+                    }}
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
+                  >
+                    <Camera className="w-4 h-4" /> 📷 Chụp & Xuất ảnh Bản đồ (.png)
+                  </button>
+
+                  <a
+                    href="/Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+                    download="Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
+                  >
+                    <Download className="w-4 h-4" /> Tải Bản đồ PDF 27 TDP Mới (Google Maps)
+                  </a>
+                </div>
               </div>
             )}
 
@@ -475,17 +487,28 @@ export default function Sidebar() {
               Dữ liệu ranh giới lịch sử 95 tổ dân phố quận Liên Chiểu theo KML.
             </p>
 
-            {/* Direct PDF Download Button for 95 Old TDPs */}
+            {/* Action Buttons for 95 Old TDPs */}
             {!isCollapsed && (
-              <a
-                href="/Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
-                download="Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 p-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
-              >
-                <Download className="w-4 h-4" /> Tải Bản đồ PDF 95 TDP Cũ (Google Maps)
-              </a>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('trigger-map-capture'));
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
+                >
+                  <Camera className="w-4 h-4" /> 📷 Chụp & Xuất ảnh Bản đồ (.png)
+                </button>
+
+                <a
+                  href="/Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+                  download="Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
+                >
+                  <Download className="w-4 h-4" /> Tải Bản đồ PDF 95 TDP Cũ (Google Maps)
+                </a>
+              </div>
             )}
 
             {/* Quick Map Display Toggle */}

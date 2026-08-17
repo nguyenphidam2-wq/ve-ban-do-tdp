@@ -436,6 +436,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     window.addEventListener('map-toggle-tdp-labels', handleToggleTdpLabels);
     window.addEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
     window.addEventListener('map-toggle-old-tdp', handleToggleOldTdp);
+    window.addEventListener('trigger-map-capture', handleCaptureMap);
 
     const handleExternalSetMode = (e: any) => {
       if (e.detail && e.detail.mode) {
@@ -471,10 +472,11 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       window.removeEventListener('map-toggle-tdp-labels', handleToggleTdpLabels);
       window.removeEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
       window.removeEventListener('map-toggle-old-tdp', handleToggleOldTdp);
+      window.removeEventListener('trigger-map-capture', handleCaptureMap);
       window.removeEventListener('map-set-mode', handleExternalSetMode);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [refreshAllData, zones, handleSetMapMode]);
+  }, [refreshAllData, zones, handleSetMapMode, handleCaptureMap]);
 
   // ponytail: periodic polling to fetch latest updates every 30 seconds for concurrent drawers
   useEffect(() => {

@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar';
 import { Suspense } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Camera } from 'lucide-react';
 
 // Dynamically import map with no SSR
 const GISMap = dynamic(() => import('@/components/Map/GISMap'), {
@@ -31,10 +31,23 @@ export default function Home() {
         <GISMap />
       </div>
 
+      {/* Floating Action Buttons (Bottom Right) */}
+      <div className="absolute bottom-6 right-6 md:bottom-10 md:right-10 z-[1000] flex flex-col gap-3 items-end">
+        {/* Floating Snapshot / Camera Button */}
+        <button 
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('trigger-map-capture'));
+          }}
+          className="group relative flex items-center justify-center w-14 h-14 md:w-16 md:h-16 bg-purple-600 hover:bg-purple-500 text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 shadow-purple-600/40 cursor-pointer border-2 border-purple-400/50"
+          title="Chụp ảnh xuất bản đồ (PNG)"
+        >
+          <Camera className="w-6 h-6 md:w-7 md:h-7 group-hover:scale-110 transition-transform" />
+          <div className="absolute right-20 bg-slate-900 px-4 py-2 rounded-lg text-sm font-bold border border-white/10 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-white shadow-xl">
+            📷 Chụp xuất ảnh Bản đồ (.png)
+          </div>
+        </button>
 
-
-      {/* Floating Action Button */}
-      <div className="absolute bottom-6 right-6 md:bottom-10 md:right-10 z-[1000]">
+        {/* Floating Pencil Button */}
         <button 
           onClick={() => {
             window.dispatchEvent(new CustomEvent('start-drawing-polygon'));
@@ -42,7 +55,7 @@ export default function Home() {
           className="group relative flex items-center justify-center w-14 h-14 md:w-16 md:h-16 bg-primary text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 shadow-primary/40 cursor-pointer"
         >
           <Pencil className="w-6 h-6 md:w-7 md:h-7 group-hover:-rotate-12 transition-transform" />
-          <div className="absolute right-20 bg-slate-900 px-4 py-2 rounded-lg text-sm font-bold border border-white/10 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="absolute right-20 bg-slate-900 px-4 py-2 rounded-lg text-sm font-bold border border-white/10 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-white shadow-xl">
             Bắt đầu vẽ ngay ✏️
           </div>
         </button>
