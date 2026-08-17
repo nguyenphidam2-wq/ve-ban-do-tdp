@@ -11,7 +11,8 @@ import {
   Search,
   Download,
   Upload,
-  Trash2
+  Trash2,
+  History
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -47,6 +48,9 @@ export default function Sidebar() {
   const [showPois, setShowPois] = useState(true);
   const [showTdpLabels, setShowTdpLabels] = useState(true);
   const [showCommunityHouses, setShowCommunityHouses] = useState(true);
+  const [showOldTdp, setShowOldTdp] = useState(false);
+  const [oldTdpZones, setOldTdpZones] = useState<any[]>([]);
+  const [oldTdpSearchQuery, setOldTdpSearchQuery] = useState('');
 
   const [mergeByName, setMergeByName] = useState(true);
 
@@ -68,6 +72,11 @@ export default function Sidebar() {
   const handleToggleCommunityHouses = (visible: boolean) => {
     setShowCommunityHouses(visible);
     window.dispatchEvent(new CustomEvent('map-toggle-community-houses', { detail: { visible } }));
+  };
+
+  const handleToggleOldTdp = (visible: boolean) => {
+    setShowOldTdp(visible);
+    window.dispatchEvent(new CustomEvent('map-toggle-old-tdp', { detail: { visible } }));
   };
 
 
@@ -171,10 +180,28 @@ export default function Sidebar() {
   useEffect(() => {
     fetchZones();
 
+    // Load 95 old TDP data
+    fetch('/lien_chieu_95_tdp_cu.geojson')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.features) {
+          setOldTdpZones(data.features);
+        }
+      })
+      .catch(err => console.error('Lỗi khi tải dữ liệu 95 TDP cũ:', err));
+
+    const handleToggleOldTdpEvent = (e: any) => {
+      if (e.detail !== undefined) {
+        setShowOldTdp(e.detail.visible);
+      }
+    };
+    window.addEventListener('map-toggle-old-tdp', handleToggleOldTdpEvent);
+
     // Listen for save events to refresh the sidebar list
     window.addEventListener('zone-saved', fetchZones);
     return () => {
       window.removeEventListener('zone-saved', fetchZones);
+      window.removeEventListener('map-toggle-old-tdp', handleToggleOldTdpEvent);
     };
   }, [fetchZones]);
 
@@ -187,6 +214,29 @@ export default function Sidebar() {
     }
   };
 
+  const handleOldTdpClick = (feat: any) => {
+    if (feat.geometry) {
+      if (feat.geometry.type === 'Point') {
+        const coords = feat.geometry.coordinates;
+        window.dispatchEvent(new CustomEvent('map-fly-to', {
+          detail: { center: [coords[1], coords[0]], zoom: 17 }
+        }));
+      } else if (feat.geometry.coordinates) {
+        const center = getPolygonCenter(
+          feat.geometry.type === 'Polygon' 
+            ? feat.geometry.coordinates 
+            : feat.geometry.coordinates[0]
+        );
+        window.dispatchEvent(new CustomEvent('map-fly-to', {
+          detail: { center, zoom: 17 }
+        }));
+      }
+      if (!showOldTdp) {
+        handleToggleOldTdp(true);
+      }
+    }
+  };
+
   // Filter zones based on search query
   const filteredZones = zones.filter(zone => {
     const props = zone.properties || {};
@@ -196,10 +246,27 @@ export default function Sidebar() {
     return name.includes(query) || id.includes(query);
   });
 
+  // Filter old TDPs based on search query
+  const filteredOldTdpZones = oldTdpZones.filter(feat => {
+    const props = feat.properties || {};
+    const name = (props.name || '').toLowerCase();
+    const desc = (props.description || '').toLowerCase();
+    const query = oldTdpSearchQuery.toLowerCase();
+    return name.includes(query) || desc.includes(query);
+  });
+
   const navItems = [
     { id: 'map', icon: MapIcon, label: 'Bản đồ số' },
+    { id: 'old_tdp', icon: History, label: 'Bản đồ Liên Chiểu 95 tổ dân phố cũ' },
     { id: 'data', icon: Database, label: 'Danh sách tổ dân phố' },
   ];
+
+  const handleNavClick = (tabId: string) => {
+    setTab(tabId);
+    if (tabId === 'old_tdp') {
+      handleToggleOldTdp(true);
+    }
+  };
 
   return (
     <>
@@ -258,16 +325,16 @@ export default function Sidebar() {
           return (
             <button
               key={item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => handleNavClick(item.id)}
               className={cn(
-                "w-full flex items-center gap-4 p-3 rounded-xl transition-all group",
+                "w-full flex items-center gap-4 p-3 rounded-xl transition-all group text-left",
                 isActive 
                   ? "bg-primary text-white shadow-lg shadow-primary/30" 
                   : "text-white/60 hover:bg-white/5 hover:text-white"
               )}
             >
               <Icon className={cn("w-6 h-6 shrink-0", isActive ? "scale-110" : "group-hover:scale-110 transition-transform")} />
-              {!isCollapsed && <span className="font-medium">{item.label}</span>}
+              {!isCollapsed && <span className="font-medium text-xs md:text-sm leading-tight">{item.label}</span>}
             </button>
           );
         })}
@@ -362,6 +429,91 @@ export default function Sidebar() {
                   <li>Click các điểm trên bản đồ để xác định đỉnh ranh giới.</li>
                   <li>Chọn khép kín đa giác để hiển thị bảng nhập thông tin và lưu lại.</li>
                 </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentTab === 'old_tdp' && (
+          <div className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span>📜</span> 95 TDP Cũ
+              </h3>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                {oldTdpZones.length} đối tượng
+              </span>
+            </div>
+            <p className="text-xs text-white/50 leading-relaxed">
+              Dữ liệu ranh giới lịch sử 95 tổ dân phố quận Liên Chiểu theo KML.
+            </p>
+
+            {/* Quick Map Display Toggle */}
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between">
+              <span className="text-xs font-semibold text-amber-200">Hiển thị trên bản đồ</span>
+              <input
+                type="checkbox"
+                checked={showOldTdp}
+                onChange={(e) => handleToggleOldTdp(e.target.checked)}
+                className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Search Box */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <input
+                type="text"
+                placeholder="Tìm tổ dân phố cũ..."
+                value={oldTdpSearchQuery}
+                onChange={(e) => setOldTdpSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-white/40 focus:outline-none focus:border-amber-500 transition-colors"
+              />
+            </div>
+
+            {/* List of Old TDPs */}
+            {!isCollapsed && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[10px] text-white/40 uppercase font-bold px-1">
+                  <span>Danh sách ({filteredOldTdpZones.length})</span>
+                  <span>Click để định vị</span>
+                </div>
+                <div className="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar pr-1">
+                  {filteredOldTdpZones.length === 0 ? (
+                    <div className="text-xs text-white/30 text-center py-6">
+                      Không tìm thấy tổ dân phố cũ phù hợp
+                    </div>
+                  ) : (
+                    filteredOldTdpZones.map((feat: any, idx: number) => {
+                      const props = feat.properties || {};
+                      const isZone = props.featureType === 'zone';
+                      return (
+                        <div
+                          key={feat.id || idx}
+                          onClick={() => handleOldTdpClick(feat)}
+                          className="p-3 bg-white/5 rounded-xl border border-white/5 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all cursor-pointer group"
+                        >
+                          <div className="flex justify-between items-center w-full">
+                            <h4 className="font-bold text-xs text-white group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                              <span>{isZone ? '🗺️' : '📍'}</span>
+                              {props.name || 'Không tên'}
+                            </h4>
+                            {props.area ? (
+                              <span className="text-[10px] font-bold text-emerald-400">
+                                {props.area} ha
+                              </span>
+                            ) : null}
+                          </div>
+                          {props.description && (
+                            <p className="mt-1 text-[10px] text-white/50 line-clamp-2 leading-relaxed">
+                              {props.description}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>

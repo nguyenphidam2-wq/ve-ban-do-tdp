@@ -222,6 +222,8 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   const [showPois, setShowPois] = useState(true);
   const [showTdpLabels, setShowTdpLabels] = useState(true);
   const [showCommunityHouses, setShowCommunityHouses] = useState(true);
+  const [showOldTdp, setShowOldTdp] = useState(false);
+  const [oldTdpFeatures, setOldTdpFeatures] = useState<any[]>([]);
   
   const [currentLayer, setCurrentLayer] = useState<any>(null);
 
@@ -270,6 +272,16 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
   useEffect(() => {
     refreshAllData();
 
+    // Load 95 old TDP GeoJSON
+    fetch('/lien_chieu_95_tdp_cu.geojson')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.features) {
+          setOldTdpFeatures(data.features);
+        }
+      })
+      .catch(err => console.error('Lỗi khi tải GeoJSON 95 TDP cũ:', err));
+
     const handleLayerChange = (e: any) => {
       if (e.detail && e.detail.layer) {
         setMapLayer(e.detail.layer);
@@ -297,6 +309,12 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     const handleToggleCommunityHouses = (e: any) => {
       if (e.detail) {
         setShowCommunityHouses(e.detail.visible);
+      }
+    };
+
+    const handleToggleOldTdp = (e: any) => {
+      if (e.detail !== undefined) {
+        setShowOldTdp(e.detail.visible);
       }
     };
 
@@ -345,6 +363,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
     window.addEventListener('map-toggle-pois', handleTogglePois);
     window.addEventListener('map-toggle-tdp-labels', handleToggleTdpLabels);
     window.addEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
+    window.addEventListener('map-toggle-old-tdp', handleToggleOldTdp);
 
     return () => {
       delete (window as any).deleteZoneFromMap;
@@ -356,6 +375,7 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
       window.removeEventListener('map-toggle-pois', handleTogglePois);
       window.removeEventListener('map-toggle-tdp-labels', handleToggleTdpLabels);
       window.removeEventListener('map-toggle-community-houses', handleToggleCommunityHouses);
+      window.removeEventListener('map-toggle-old-tdp', handleToggleOldTdp);
     };
   }, [refreshAllData, zones]);
 
@@ -674,6 +694,79 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         
 
 
+        {/* Render 95 Old TDP Boundaries & POIs */}
+        {showOldTdp && oldTdpFeatures.map((feat: any, idx: number) => {
+          if (feat.geometry?.type === 'Polygon' || feat.geometry?.type === 'MultiPolygon') {
+            const positions = getPolygonPositions(feat.geometry);
+            const props = feat.properties || {};
+            const color = POLY_COLORS[idx % POLY_COLORS.length];
+            return (
+              <Polygon
+                key={feat.id || `old_tdp_${idx}`}
+                positions={positions}
+                pathOptions={{
+                  color: color,
+                  fillColor: color,
+                  fillOpacity: 0.3,
+                  weight: 2.5,
+                  dashArray: '5, 5'
+                }}
+              >
+                <Popup className="custom-leaflet-popup">
+                  <div className="p-3 min-w-[220px] bg-slate-950 text-white rounded-xl border border-amber-500/40 shadow-2xl">
+                    <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold uppercase tracking-wider mb-1">
+                      <span>🏛️</span> 95 TDP CŨ LIÊN CHIỂU
+                    </div>
+                    <h3 className="font-bold text-base text-white border-b border-white/10 pb-1.5 mb-2">
+                      {props.name || 'Không tên'}
+                    </h3>
+                    <div className="space-y-1 text-xs text-white/80">
+                      {props.area ? (
+                        <div className="flex justify-between">
+                          <span className="text-white/40">Diện tích:</span>
+                          <span className="font-bold text-emerald-400">{props.area} ha</span>
+                        </div>
+                      ) : null}
+                      {props.description ? (
+                        <div className="mt-2 p-2 rounded bg-white/5 border border-white/5 text-[11px] leading-relaxed text-amber-200">
+                          {props.description}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </Popup>
+              </Polygon>
+            );
+          } else if (feat.geometry?.type === 'Point') {
+            const coords = feat.geometry.coordinates;
+            const props = feat.properties || {};
+            if (!coords || coords.length < 2) return null;
+            return (
+              <Marker
+                key={feat.id || `old_poi_${idx}`}
+                position={[coords[1], coords[0]]}
+                icon={L.divIcon({
+                  html: `<div class="flex items-center justify-center text-xs font-bold bg-amber-500 text-slate-950 border border-white rounded-full w-7 h-7 shadow-lg hover:scale-110 transition-transform cursor-pointer" title="${props.name}">📍</div>`,
+                  className: 'custom-poi-icon',
+                  iconSize: [28, 28],
+                  iconAnchor: [14, 14]
+                })}
+              >
+                <Popup className="custom-leaflet-popup">
+                  <div className="p-3 min-w-[200px] bg-slate-950 text-white rounded-xl border border-amber-500/40 shadow-2xl">
+                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Mốc chú ý (95 TDP cũ)</span>
+                    <h3 className="font-bold text-sm text-white mt-1">{props.name}</h3>
+                    {props.description && (
+                      <p className="text-xs text-white/70 mt-1 leading-relaxed">{props.description}</p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          }
+          return null;
+        })}
+
         <MapController 
           onZoneCreated={handleZoneCreated} 
           onPoiCreated={handlePoiCreated} 
@@ -711,6 +804,20 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
           title="Ẩn/Hiện Nhà Sinh Hoạt Cộng Đồng"
         >
           <span>🏛️</span> Nhà SHCĐ ({pois.filter(p => p.properties?.type === 'community_house').length})
+        </button>
+
+        <button
+          onClick={() => {
+            const next = !showOldTdp;
+            setShowOldTdp(next);
+            window.dispatchEvent(new CustomEvent('map-toggle-old-tdp', { detail: { visible: next } }));
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            showOldTdp ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/30 ring-1 ring-amber-400/50' : 'bg-white/5 text-white/40 hover:bg-white/10'
+          }`}
+          title="Ẩn/Hiện Bản đồ 95 Tổ Dân Phố Cũ"
+        >
+          <span>📜</span> 95 TDP Cũ ({oldTdpFeatures.filter((f: any) => f.properties?.featureType === 'zone').length})
         </button>
       </div>
 
