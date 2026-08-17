@@ -871,8 +871,33 @@ export default function GISMap({ center = [16.0745, 108.1385], zoom = 14 }: GISM
         </button>
       </div>
 
-      {/* Quick Filter Bar for POI & Zone Toggles */}
+      {/* Quick Filter Bar for POI & Zone Toggles & Direct PDF Downloads */}
       <div className="absolute top-4 right-4 z-[1000] flex flex-wrap items-center gap-2 bg-slate-950/85 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 shadow-2xl">
+        <a
+          href="/Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+          download="Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 ring-1 ring-blue-400/50"
+          title="Tải Bản đồ PDF 27 Tổ Dân Phố Mới (Nền Google Maps)"
+        >
+          <span>📥</span>
+          <span>PDF 27 TDP Mới</span>
+        </a>
+
+        <a
+          href="/Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+          download="Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/30 ring-1 ring-amber-400/50"
+          title="Tải Bản đồ PDF 95 Tổ Dân Phố Cũ (Nền Google Maps)"
+        >
+          <span>📥</span>
+          <span>PDF 95 TDP Cũ</span>
+        </a>
+
+        <div className="w-px h-5 bg-white/20 hidden sm:block"></div>
 
         <button
           onClick={() => setShowCommunityHouses(!showCommunityHouses)}

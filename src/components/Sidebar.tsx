@@ -432,6 +432,17 @@ export default function Sidebar() {
                     <span>🏛️ Nhà SHCĐ / Thiết Chế VH (30)</span>
                   </label>
                 </div>
+
+                {/* Direct PDF Download Button for 27 New TDPs */}
+                <a
+                  href="/Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+                  download="Ban_Do_27_To_Dan_Pho_Moi_Lien_Chieu.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
+                >
+                  <Download className="w-4 h-4" /> Tải Bản đồ PDF 27 TDP Mới (Google Maps)
+                </a>
               </div>
             )}
 
@@ -463,6 +474,19 @@ export default function Sidebar() {
             <p className="text-xs text-white/50 leading-relaxed">
               Dữ liệu ranh giới lịch sử 95 tổ dân phố quận Liên Chiểu theo KML.
             </p>
+
+            {/* Direct PDF Download Button for 95 Old TDPs */}
+            {!isCollapsed && (
+              <a
+                href="/Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+                download="Ban_Do_95_To_Dan_Pho_Cu_Lien_Chieu.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 p-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-600/25 transition-all hover:scale-[1.02] cursor-pointer text-center"
+              >
+                <Download className="w-4 h-4" /> Tải Bản đồ PDF 95 TDP Cũ (Google Maps)
+              </a>
+            )}
 
             {/* Quick Map Display Toggle */}
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between">
