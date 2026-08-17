@@ -352,32 +352,6 @@ export default function Sidebar() {
               </div>
             )}
 
-            {/* Digitizing Tools */}
-            {!isCollapsed && (
-              <div className="space-y-2">
-                <span className="text-[10px] text-white/40 uppercase font-bold px-1">Công cụ số hóa</span>
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => window.dispatchEvent(new CustomEvent('start-drawing-polygon'))}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] cursor-pointer"
-                  >
-                    ✏️ Vẽ ranh giới Tổ dân phố
-                  </button>
-                  <button
-                    onClick={() => window.dispatchEvent(new CustomEvent('start-drawing-marker'))}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-600/20 transition-all hover:scale-[1.02] cursor-pointer"
-                  >
-                    📍 Cắm mốc chú ý (Karaoke, PCCC...)
-                  </button>
-                  <button
-                    onClick={() => window.dispatchEvent(new CustomEvent('open-merge-modal'))}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-cyan-600/20 transition-all hover:scale-[1.02] cursor-pointer border border-cyan-400/30"
-                  >
-                    🧩 Sáp nhập TDP & Khóa ranh giới
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Help Section */}
             {!isCollapsed && (
